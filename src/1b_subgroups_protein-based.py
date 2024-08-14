@@ -1,6 +1,9 @@
+#!/usr/bin/env python3
+
 import os
 import sys
 import argparse
+from os import makedirs
 from Bio import SeqIO
 from Bio import AlignIO
 
@@ -75,6 +78,9 @@ def main(args):
 
     # Create file with subgroups
     outpath = os.path.join(args.subgroupoutpath, 'subgroups.txt')
+
+    makedirs(args.subgroupoutpath,mode=0o755,exist_ok=True)
+
     store_output_in_txt_file(outpath, ids, y)
     print("Finished")
         
