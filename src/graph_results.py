@@ -10,31 +10,8 @@ from statistics import median, mean
 import numpy as np
 from math import log
 
-def plot_SE(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_graphics', highlight_file:str = None) -> None:
+def __read_consensus_file(consensus_file:str=None,data:dict=None,msa_links:dict=None) -> list:
 
-	if not exists(SE_file):
-		print(f"\n\n\t[E]  {SE_file} does not exist!\n")
-		exit
-
-	data = {}
-	msa_links = {}
-	with open(SE_file,'r') as IN:
-		for line in IN:
-			line = line.strip()
-
-			if line == "":
-				continue
-
-			if line[0] == "#":
-				continue
-
-			pos,msa_pos,res,se,fse,num_seqs,fog = line.split()
-
-			data[int(pos)] = {"RES":res,"SE":abs(float(fse)),"NUM_RES":None,"MSA_POS":msa_pos,"MED_RES":None}
-			msa_links[int(msa_pos)] = int(pos)
-
-	num_seqs = 0
-	aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
 	with open(consensus_file,'r') as IN:
 		for line in IN:
 			line = line.strip()
@@ -50,15 +27,18 @@ def plot_SE(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE
 			msa_pos = int(msa_pos)
 
 			if msa_pos in msa_links.keys():
-				non_gapped_data = [x for x in res_nums.split(";") if x.split(":")[0] in aas]
+				non_gapped_data = [x for x in res_nums.split(";") if x.split(":")[0]]
+				data[msa_links[msa_pos]]["CON_RES"] = non_gapped_data[0].split(":")[0]
 				data[msa_links[msa_pos]]["RES_COUNTS"] = {x.split(":")[0]:float(x.split(":")[-1]) for x in non_gapped_data}
-				num_seqs = sum([float(x.split(":")[-1]) for x in res_nums.split(";")])
 				data[msa_links[msa_pos]]["NUM_RES"] = len(non_gapped_data)
 				temp_data = [int(x.split(":")[-1]) for x in non_gapped_data]
 				data[msa_links[msa_pos]]["DEV"] = abs(mean(temp_data)-median(temp_data))/(mean(temp_data))
 
-	highlights = {}
+	return data
 
+def __read_res_highlight_file(highlight_file:str=None) -> dict:
+
+	highlights = {}
 	if exists(highlight_file):
 		source = None
 		with open(highlight_file,'r') as IN:
@@ -83,30 +63,96 @@ def plot_SE(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE
 					if int(values[0]) not in highlights[source]:
 						highlights[source].append(int(values[0]))
 
+	return highlights
+
+def __read_SE_data(SE_file:str=None) -> list:
+
+	if not exists(SE_file):
+		print(f"\n\n\t[E]  {SE_file} does not exist!\n")
+		exit
+
+	data = {}
+	msa_links = {}
+
+	with open(SE_file,'r') as IN:
+		for line in IN:
+			line = line.strip()
+
+			if line == "":
+				continue
+
+			if line[0] == "#":
+				continue
+
+			pos,msa_pos,res,se,fse,num_seqs,fog = line.split()
+
+			data[int(pos)+1] = {"RES":res,"SE":abs(float(fse)),"NUM_RES":None,"MSA_POS":msa_pos}
+			msa_links[int(msa_pos)] = int(pos) + 1
+
+	return data,msa_links
+
+
+def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_graphics', highlight_file:str = None) -> None:
+
+	aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
+
+	# Read in Shannon Entropy
+	data,msa_links = __read_SE_data(SE_file=SE_file)
+
+	# Read in Concensus Sequence
+	data = __read_consensus_file(consensus_file=consensus_file,data=data,msa_links=msa_links)
+	
+	## Read in residues to highlight in the graphic
+	highlights = __read_res_highlight_file(highlight_file=highlight_file)
+	
+	# Reference residue sequences
 	res_nums = sorted(data.keys())
 
-	num_of_res = len(res_nums)
-	font_size = 6
-	width = font_size*(1/72)*(num_of_res)*1.5
+	# Number of sequences present in MSA
+	num_of_seq = sum(x for x in data[res_nums[0]]["RES_COUNTS"].values())
 
-	y = [data[x]["SE"] for x in res_nums]
-	labels = [f"{data[x]["RES"]} - {x+1}"  if x%2 == 0 else f"{data[x]["RES"]}" for x in res_nums]
+	# Number of residues in the reference sequence
+	len_of_seq = len(res_nums)
+	# Font size of tick labels
+	font_size = 6
+	# Width of the graphic as to not have labels overlapping each other
+	width = font_size*(1/72)*(len_of_seq)*1.5
+	
+	####################################################################################################################
+	## Setting up graphics
+	####################################################################################################################
 
 	fig = plt.figure()
-
-	colors = mcolors.CSS4_COLORS
-	color_keys = [x for x in colors]
-
-	res_num_graph = plt.subplot2grid((5,1),(4,0))
-	res_mat_graph = plt.subplot2grid((5,1),(1,0),rowspan=2)
-	res_dist_graph = plt.subplot2grid((5,1),(3,0))
-
-	############################################################
-	## Shannon Entropy Graphing
-	############################################################
-
-	## Positional the plot in the subplot
+	
+	## Specifying plot placements
+	# Shannon Entropy 1st
 	se_graph = plt.subplot2grid((5,1),(0,0))
+	# Residue presense matrix 2nd, spans 2 rows
+	res_mat_graph = plt.subplot2grid((5,1),(1,0),rowspan=2)
+	# Number of different residues present at site
+	num_ress = np.zeros(len_of_seq)
+	res_num_graph = plt.subplot2grid((5,1),(3,0))
+	# Number of sequences belonging to that residue
+	res_dist_graph = plt.subplot2grid((5,1),(4,0))
+	
+	## Load CSS colors for iterative coloring
+	colors = mcolors.XKCD_COLORS
+	color_keys = [
+		"aqua","blue","chartreuse","coral","crimson",
+		"darkgreen","fuchsia","goldenrod","indigo","navy",
+		"olive","orange","orangered","orchid","salmon",
+		"teal","tomato","yellowgreen","grey","khaki"
+	]
+
+	####################################################################################################################
+	## Shannon Entropy Graphing
+	####################################################################################################################
+
+	# Shannon Entropies for the reference
+	se_values = [data[x]["SE"] for x in res_nums]
+
+	# Residue and residue number labels
+	labels = [f"{data[x]["RES"]} [{x}]"  if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
 
 	## Expand the graph slightly past the plotted data
 	se_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
@@ -124,20 +170,21 @@ def plot_SE(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE
 	se_graph.add_patch(plt.Rectangle((res_nums[0]-1,.25),(res_nums[-1]+2),0.5,color='y',alpha=0.1))
 	se_graph.add_patch(plt.Rectangle((res_nums[0]-1,.75),(res_nums[-1]+2),1,color='r',alpha=0.1))
 	
-	# # Highlight residues with near equal representation in MSA
-	# for i,val_x in enumerate(x):
-	# 	num_res = data[val_x]["NUM_RES"]
-	# 	num_ress[i] = num_res
-	# 	med_res = data[val_x]["MED_RES"]
-	# 	if num_res < 10:
-	# 		continue
-	# se_graph.plot(val_x,data[val_x]["SE"],marker="*",markersize=10*(1-data[val_x]["DEV"]),color='b')
+	# Highlight residues with near equal representation in MSA
+	for i,val_x in enumerate(res_nums):
+		num_res = data[val_x]["NUM_RES"]
+		num_res -= 1 if '-' in data[val_x]["RES_COUNTS"].keys() else 0
+		num_res -= 1 if 'X' in data[val_x]["RES_COUNTS"].keys() else 0
+		num_ress[i] = num_res
+		if num_res < 10:
+			continue
+		se_graph.plot(val_x,data[val_x]["SE"],marker="*",markersize=10*(1-data[val_x]["DEV"]),color='b')
 
 	## Highlight user-given residues
 	if exists(highlight_file):
 		used_colors = []
 		for source in highlights.keys():
-			color = colors[color_keys[randint(0,len(color_keys))]]
+			color = colors[f"xkcd:{color_keys[randint(0,len(color_keys)-1)]}"]
 			while color in used_colors:
 				if sorted(used_colors) == sorted(color_keys):
 					used_colors = []
@@ -146,108 +193,147 @@ def plot_SE(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE
 				used_colors.append(color)
 
 	## Plot the data
-	se_graph.plot(res_nums,y,linewidth=0.5,color='k')
+	se_graph.plot(res_nums,se_values,linewidth=0.5,color='k')
 
 	## Prettify the Y-axis
 	se_graph.yaxis.set_ticks([i*0.2 for i in range(int(1/0.2)+1)])
-	se_graph.yaxis.set_ticklabels(["",0.2,0.4,0.6,0.8,1.0])
+	se_graph.yaxis.set_ticklabels([0.0,0.2,0.4,0.6,0.8,1.0])
 
+	se_graph.tick_params(axis='x',which='both',bottom=False,labelbottom=False)
+	se_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
+	se_graph.spines['bottom'].set_visible(False)
+	axt = se_graph.secondary_xaxis('top')
+	axt.set_xticks(res_nums)
+	axt.set_xticklabels(labels,font='monospace',fontsize=font_size,ha='center',va='bottom',rotation='vertical')
 
-	fig.set_size_inches(width,10)
-	plt.savefig("MyTest.png",dpi=500)
+	####################################################################################################################
+	## Residue Presence Matrix
+	####################################################################################################################
 
-	exit()
+	## Get a positive/negative matrix of what residues are present in the MSA at each residue
+	present_res = np.zeros((len(aas),len(res_nums)))
+	for row_index,aa in enumerate(aas):
+		for col_index,val_x in enumerate(res_nums):
+			if aa in data[val_x]["RES_COUNTS"].keys():
+				present_res[row_index][col_index] = 1 if data[val_x]["RES_COUNTS"][aa] > 0 else 0
 
-	# se_graph.tick_params(axis='x',which='both',bottom=False,labelbottom=False)
-	# se_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
-	# se_graph.spines['bottom'].set_visible(False)
-	# axt = se_graph.secondary_xaxis('top')
-	# axt.set_xticks(x)
-	# axt.set_xticklabels(labels,font='monospace',fontsize=font_size,ha='center',rotation='vertical')
+	res_mat_graph.matshow(present_res,aspect='auto',cmap='tab20_r')
 
+	## Setup Y-Axis
+	res_mat_graph.set_yticks([i for i in range(len(aas))],labels=aas,font='monospace')
+	res_mat_graph.yaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	res_mat_graph.yaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
+	res_mat_graph.tick_params(axis='y',which='minor',left=False)
 
-	# ############################################################
-	# ## Residue Distribution Bar Graph
-	# ############################################################
+	## Setup X-Axis
+	# Set major tick for each residue [0 to pos-1]
+	res_mat_graph.xaxis.set_ticks([i-1 for i in res_nums])
+	# Set and rotate major tick labels
+	labels = [f"{val_x: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
+	res_mat_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
+	# Show major tick labels, but not the ticks themselves, and only on the top
+	res_mat_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=True,labelbottom=False)
 
-
-
-	# num_ress = np.zeros(len(x))
-	# res_dist_graph.bar(x,num_ress,1)
-	# res_dist_graph.spines['top'].set_visible(False)
-	# res_dist_graph.spines['bottom'].set_visible(False)
-	# res_dist_graph.tick_params(axis='x',which='both',top=False,bottom=False,labeltop=False,labelbottom=False)
-	# res_dist_graph.set_xlim([(x[0]-0.5),x[-1]+0.5])
-	# res_dist_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-	# res_dist_graph.yaxis.set_ticks([i*5 for i in range(int(20/5)+1)])
-	# res_dist_graph.set_yticklabels(["",5,10,15,20])
-	# res_dist_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
-	# res_dist_graph.tick_params(axis='x',which='minor',top=False,bottom=False)
-	# res_dist_graph.plot([x[0]-0.5,x[-1]+0.5],[10,10],color='aqua',linestyle='-',linewidth=2)
-	# res_dist_graph.plot([x[0]-0.5,x[-1]+0.5],[20,20],color='aqua',linestyle='-',linewidth=2)
-	# res_dist_graph.set_ylim([-0.05,21])
+	# Set minor ticks for each residue, but offset by -0.5 to create fake gridlines
+	res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	# Don't show any information regarding the minor ticks
+	res_mat_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
 	
-	# bottoms = np.zeros(len(x))
-	# for i in range(len(aas)):
-	# 	res_vals = np.zeros(len(x))
-	# 	for index,val_x in enumerate(x):
-	# 		if i < len(data[val_x]["RES_COUNTS"].keys()):
-	# 			res_vals[index] = sorted(data[val_x]["RES_COUNTS"].values(),reverse=True)[i]/num_seqs if sorted(data[val_x]["RES_COUNTS"].keys(),reverse=True,key=lambda x: data[val_x]["RES_COUNTS"][x])[i] != "-" else 0
-	# 		else:
-	# 			res_vals[index] = 0
-	# 	res_num_graph.bar(x,res_vals,1,bottom=bottoms)
-	# 	bottoms += res_vals
+	# Hide the top and bottom axes
+	res_mat_graph.spines['top'].set_visible(False)
+	res_mat_graph.spines['bottom'].set_visible(False)
 
-	# ############################################################
-	# ## Number of Residue Bar Graph
-	# ############################################################
+	# Turn on X-axis gridlines using the minor ticks
+	res_mat_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
 
-	# res_num_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-	# res_num_graph.yaxis.set_ticks([i*0.2 for i in range(int(1/0.2)+1)])
-	# res_num_graph.set_yticklabels(["",0.2,0.4,0.6,0.8,1.0])
-	# res_num_graph.set_xlim([(x[0]-0.5),x[-1]+0.5])
-	# res_num_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
-	# res_num_graph.spines['top'].set_visible(False)
-	# res_num_graph.xaxis.set_major_locator(MultipleLocator(25))
-	# res_num_graph.tick_params(axis='x',which='major',top=False,labelbottom=True,labeltop=False,length=5)
-	# res_num_graph.tick_params(axis='x',which='minor',top=False,bottom=False)
-	# res_num_graph.set_ylim([0,1.05])
+	####################################################################################################################
+	## Number of Residue Bar Graph
+	####################################################################################################################
 
-	# values = np.zeros((len(aas),len(x)))
-	# for row_index,aa in enumerate(aas):
-	# 	for col_index,val_x in enumerate(x):
-	# 		if aa in data[val_x]["RES_COUNTS"].keys():
-	# 			values[row_index][col_index] = 1 if data[val_x]["RES_COUNTS"][aa] > 0 else 0
+	res_num_graph.bar(res_nums,num_ress,1)
 
-	# ############################################################
-	# ## Residue Presence Matrix
-	# ############################################################
+	## Setup X-Axis
+	# Set major tick for each residue [0 to pos-1]
+	res_num_graph.xaxis.set_ticks([i for i in res_nums])
+	# Set and rotate major tick labels
+	res_num_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
+	res_num_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
 
-	# res_mat_graph.matshow(values,aspect='auto',cmap='tab20_r')
-	# res_mat_graph.set_yticks([i for i in range(len(aas))],labels=aas,font='monospace')
-	# res_mat_graph.yaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-	# res_mat_graph.yaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
-	# res_mat_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
-	# res_mat_graph.xaxis.set_major_locator(MultipleLocator(25))
-	# res_mat_graph.tick_params(axis='x',which='both',top=False,bottom=False,labeltop=False,labelbottom=False)
-	# res_mat_graph.tick_params(axis='x',which='minor',labeltop=True,labelbottom=True)
-	# res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-	# res_mat_graph.set_xticklabels(minor=True,labels=[f" {val_x} " for val_x in x],rotation='vertical',fontsize=font_size,va='center',ha='center')
-	# res_mat_graph.tick_params(axis='y',which='minor',left=False)
-	# res_mat_graph.spines['top'].set_visible(False)
-	# res_mat_graph.spines['bottom'].set_visible(False)
+	res_num_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	res_num_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
+	res_num_graph.tick_params(axis='x',which='minor',top=False,bottom=False)
 
-	# fig.subplots_adjust(hspace=0.15)
-	# # plt.tight_layout()
-	# file_prefix = SE_file.split("/")[-1].split(".")[0]
-	# makedirs(output_dir,mode=0o755,exist_ok=True)
-	# plt.savefig(f"{output_dir}/{file_prefix}.png",dpi=300)
+	res_num_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
 
-	# return None
+	## Setup Y-Axis
+	res_num_graph.set_ylim([-0.05,21])
+	res_num_graph.set_yticks([0,5,10,15,20])
+	
+	# Show horizontal guidelines
+	res_num_graph.plot([res_nums[0]-0.5,res_nums[-1]+0.5],[5,5],color='w',linestyle='--',linewidth=1)
+	res_num_graph.plot([res_nums[0]-0.5,res_nums[-1]+0.5],[10,10],color='aqua',linestyle='-',linewidth=1)
+	res_num_graph.plot([res_nums[0]-0.5,res_nums[-1]+0.5],[15,15],color='w',linestyle='--',linewidth=1)
+	res_num_graph.plot([res_nums[0]-0.5,res_nums[-1]+0.5],[20,20],color='aqua',linestyle='-',linewidth=1)
+
+	# Hide the top and bottom axes
+	res_num_graph.spines['top'].set_visible(False)
+	res_num_graph.spines['bottom'].set_visible(False)
+	
+
+	# ###################################################################################################################
+	# ## Residue Distribution Bar Graph
+	# ###################################################################################################################
+
+	# Stacking bars require a y-value to place the bottom of the bar
+	
+	bottoms = np.zeros(len_of_seq)
+
+	for i in range(len(aas)):
+		res_vals = np.zeros(len_of_seq)
+		for index,val_x in enumerate(res_nums):
+			if i < len(data[val_x]["RES_COUNTS"].keys()):
+				sorted_res_counts = sorted(data[val_x]["RES_COUNTS"].keys(),reverse=True,key=lambda x: data[val_x]["RES_COUNTS"][x])
+				res_vals[index] = data[val_x]["RES_COUNTS"][sorted_res_counts[i]]/num_of_seq if sorted_res_counts[i] != "-" else 0
+			else:
+				res_vals[index] = 0
+		res_dist_graph.bar(res_nums,res_vals,1,bottom=bottoms)
+		bottoms += res_vals
+
+	## Setup top X-Axis
+	res_dist_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
+	# Set major tick for each residue [0 to pos-1]
+	res_dist_graph.xaxis.set_ticks([i for i in res_nums])
+	# Set and rotate major tick labels
+	res_dist_graph.set_xticklabels(labels=labels,rotation='vertical',fontsize=font_size,va='center',ha='center')
+	res_dist_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
+	res_dist_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
+	res_dist_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	res_dist_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
+	## Setup bottom X-Axis
+	rdg_bt = res_dist_graph.secondary_xaxis("bottom")
+	rdg_bt.set_xticks([i for i in res_nums])
+	rdg_bt.tick_params(which='both',bottom=False)
+	labels = [f"[{x}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
+	rdg_bt.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size)
+
+	## Setup Y-Axis
+	res_dist_graph.yaxis.set_ticks([i*0.2 for i in range(int(1/0.2)+1)])
+	res_dist_graph.yaxis.set_ticklabels([0.0,0.2,0.4,0.6,0.8,1.0])
+
+	res_dist_graph.spines['top'].set_visible(False)
+	
+	## Saving Files
+
+	file_prefix = SE_file.split("/")[-1].split(".")[0]
+	makedirs(output_dir,mode=0o755,exist_ok=True)
+	fig.set_size_inches(width,10)
+	plt.savefig(f"{output_dir}/{file_prefix}.png",dpi=500)
+	
+	return None
 
 def run(args=None) -> None:
 
-	plot_SE(SE_file=args.shannon_entropy_file,consensus_file=args.consensus_sequence_file,highlight_file=args.highlight_residues,output_dir=args.outdir)
+	plot(SE_file=args.shannon_entropy_file,consensus_file=args.consensus_sequence_file,highlight_file=args.highlight_residues,output_dir=args.outdir)
 
 	return None
 
@@ -261,5 +347,6 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-o","--outdir",required=False,type=str,default="se_graphics")
 	GetOptions.add_argument("-y","--highlight_residues",required=False,type=str)
 	GetOptions.add_argument("-c","--consensus_sequence_file",required=False,type=str)
+	GetOptions.add_argument("-a","--average_entropy_file",required=False)
 
 	run(GetOptions.parse_known_args()[0])
