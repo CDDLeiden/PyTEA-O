@@ -187,7 +187,8 @@ def plot(args=None) -> None:
 	se_values = np.array([data[x]["SE"] for x in res_nums])
 
 	# Residue and residue number labels
-	labels = [f"{data[x]["RES"]} [{x+1}]" if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
+	# labels = [f"{data[x]["RES"]} [{x}]"  if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
+	labels = [f"{data[x]['RES']} [{x}]" if x % 2 != 0 else f"{data[x]['RES']}" for x in res_nums]
 
 	## Expand the graph slightly past the plotted data
 	se_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
@@ -299,7 +300,8 @@ def plot(args=None) -> None:
 
 	## Setup Y-Axis
 	res_mat_graph.set_yticks([i for i in range(len(aas))],labels=aas,font='monospace')
-	res_mat_graph.yaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	# res_mat_graph.yaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	res_mat_graph.yaxis.set_minor_locator(MultipleLocator(1))
 	res_mat_graph.yaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
 	res_mat_graph.tick_params(axis='y',which='minor',left=False)
 
@@ -313,7 +315,8 @@ def plot(args=None) -> None:
 	res_mat_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=True,labelbottom=False)
 
 	# Set minor ticks for each residue, but offset by -0.5 to create fake gridlines
-	res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	# res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1))
 	# Don't show any information regarding the minor ticks
 	res_mat_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
 	
@@ -339,7 +342,8 @@ def plot(args=None) -> None:
 	res_num_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
 	res_num_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
 
-	res_num_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	# res_num_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	res_num_graph.xaxis.set_minor_locator(MultipleLocator(1))
 	res_num_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
 	res_num_graph.tick_params(axis='x',which='minor',top=False,bottom=False)
 
@@ -387,13 +391,15 @@ def plot(args=None) -> None:
 	res_dist_graph.set_xticklabels(labels=labels,rotation='vertical',fontsize=font_size,va='center',ha='center')
 	res_dist_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
 	res_dist_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
-	res_dist_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	# res_dist_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	res_dist_graph.xaxis.set_minor_locator(MultipleLocator(1))
 	res_dist_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
 	## Setup bottom X-Axis
 	rdg_bt = res_dist_graph.secondary_xaxis("bottom")
 	rdg_bt.set_xticks([i for i in res_nums])
 	rdg_bt.tick_params(which='both',bottom=False)
-	labels = [f"[{x+1}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
+	# labels = [f"[{x}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
+	labels = [f"[{x}] {data[x]['CON_RES']}" if x % 2 != 0 else data[x]['CON_RES'] for x in res_nums]
 	rdg_bt.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size)
 
 	## Setup Y-Axis
