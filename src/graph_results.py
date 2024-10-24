@@ -9,6 +9,9 @@ from os.path import exists
 from os import makedirs
 from statistics import median, mean
 import numpy as np
+import pandas as pd
+from math import log
+import sys
 
 def __read_average_entropy_file(average_SE_file:str=None,msa_links:dict=None) -> np.array:
 	
@@ -54,7 +57,7 @@ def __read_consensus_file(consensus_file:str=None,data:dict=None,msa_links:dict=
 				data[msa_links[msa_pos]]["NUM_RES"] = len(non_gapped_data)
 				temp_data = [int(x.split(":")[-1]) for x in non_gapped_data]
 				data[msa_links[msa_pos]]["DEV"] = abs(mean(temp_data)-median(temp_data))/(mean(temp_data))
-
+	
 	return data
 
 def __read_res_highlight_file(highlight_file:str=None) -> dict:
@@ -112,16 +115,20 @@ def __read_SE_data(SE_file:str=None) -> list:
 
 	return data,msa_links
 
+def __read_zscale_data(zscale_file:str=None) -> dict:
+	
+	data = {}
 
-def plot(args=None) -> None:
+	df = pd.read_csv(zscale_file,sep=";",header=0)
+	for index,row in df.iterrows():
+		if not row['Res'] == '-':
+			data[int(row['MSA_position'])] = [row['Z1'], row['Z2'], row['Z3'], row['Z4'], row['Z5']]
+	return data
 
-	SE_file=args.shannon_entropy_file
-	consensus_file=args.consensus_sequence_file
-	highlight_file=args.highlight_residues
-	average_SE_file=args.average_entropy_file
-	output_dir=args.outdir
+def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_graphics', highlight_file:str = None, zscale_file:str = None) -> None:
 
 	aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
+	scales = ['Z1','Z2','Z3','Z4','Z5']
 
 	# Read in Shannon Entropy
 	data,msa_links = __read_SE_data(SE_file=SE_file)
@@ -131,9 +138,12 @@ def plot(args=None) -> None:
 
 	# Read in Concensus Sequence
 	data = __read_consensus_file(consensus_file=consensus_file,data=data,msa_links=msa_links)
-	
+
 	## Read in residues to highlight in the graphic
 	highlights = __read_res_highlight_file(highlight_file=highlight_file)
+
+	# Read in Z-Scale data
+	zscales = __read_zscale_data(zscale_file=zscale_file)
 	
 	# Reference residue sequences
 	res_nums = sorted(data.keys())
@@ -170,6 +180,18 @@ def plot(args=None) -> None:
 	# Number of sequences belonging to that residue
 	res_dist_graph = plt.subplot2grid((plot_rows,plot_columns),(5,0))
 
+	se_graph = plt.subplot2grid((6,1),(0,0))
+	# Residue presense matrix 2nd, spans 2 rows
+	res_mat_graph = plt.subplot2grid((6,1),(1,0),rowspan=2)
+	# Number of different residues present at site
+	num_ress = np.zeros(len_of_seq)
+	res_num_graph = plt.subplot2grid((6,1),(3,0))
+	# Number of sequences belonging to that residue
+	res_dist_graph = plt.subplot2grid((6,1),(4,0))
+	# Difference in physicochemical properties in residues at each position
+	zscale_graph = plt.subplot2grid((6,1),(5,0))
+
+	
 	## Load CSS colors for iterative coloring
 	colors = mcolors.XKCD_COLORS
 	color_keys = [
@@ -407,7 +429,54 @@ def plot(args=None) -> None:
 	res_dist_graph.yaxis.set_ticklabels([0.0,0.2,0.4,0.6,0.8,1.0])
 
 	res_dist_graph.spines['top'].set_visible(False)
+
+	####################################################################################################################
+	## Physicochemical properties distribution, based on Z-scales
+	####################################################################################################################
+
+	print("length of res_nums",len(res_nums))
+	print("number of items in data", len(zscales.keys()))
+
+	## Store the Z-scales for each residue
+	m = np.zeros((len(scales), len(res_nums))) # TODO Hardcoded for 5 Z-scales. What if other descriptors are used?
+
+	for msa_pos, z in zscales.items():
+		print(msa_pos,z)
+		if msa_pos < len(res_nums):  # Ensure msa_pos is within the valid index range (0 to 1035)
+			for row_idx, value in enumerate(z):
+				m[row_idx, msa_pos] = value  # This will work as long as msa_pos is valid
+
+	zscale_graph.matshow(m,aspect='auto',cmap='Reds')
+
+	# ## Setup Y-Axis
+	# zscale_graph.set_yticks([i for i in range(len(aas))],labels=aas,font='monospace')
+	# # res_mat_graph.yaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	# zscale_graph.yaxis.set_minor_locator(MultipleLocator(1))
+	# zscale_graph.yaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
+	# zscale_graph.tick_params(axis='y',which='minor',left=False)
+
+	# ## Setup X-Axis
+	# # Set major tick for each residue [0 to pos-1]
+	# zscale_graph.xaxis.set_ticks([i-1 for i in res_nums])
+	# # Set and rotate major tick labels
+	# labels = [f"{val_x: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
+	# zscale_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
+	# # Show major tick labels, but not the ticks themselves, and only on the top
+	# zscale_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=True,labelbottom=False)
+
+	# # Set minor ticks for each residue, but offset by -0.5 to create fake gridlines
+	# # res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	# zscale_graph.xaxis.set_minor_locator(MultipleLocator(1))
+	# # Don't show any information regarding the minor ticks
+	# zscale_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
 	
+	# # Hide the top and bottom axes
+	# zscale_graph.spines['top'].set_visible(False)
+	# zscale_graph.spines['bottom'].set_visible(False)
+
+	# # Turn on X-axis gridlines using the minor ticks
+	# zscale_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
+
 	## Saving Files
 
 	file_prefix = SE_file.split("/")[-1].split(".")[0]
@@ -416,6 +485,12 @@ def plot(args=None) -> None:
 	plt.tight_layout()
 	plt.savefig(f"{output_dir}/{file_prefix}.png",dpi=500)
 	
+	return None
+
+def run(args=None) -> None:
+
+	plot(SE_file=args.shannon_entropy_file,consensus_file=args.consensus_sequence_file,highlight_file=args.highlight_residues,zscale_file=args.zscale_file,output_dir=args.outdir)
+
 	return None
 
 if __name__ == "__main__":
@@ -429,5 +504,6 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-y","--highlight_residues",required=False,type=str)
 	GetOptions.add_argument("-c","--consensus_sequence_file",required=False,type=str)
 	GetOptions.add_argument("-a","--average_entropy_file",required=False)
+	GetOptions.add_argument("-z","--zscale_file",required=False,type=str)
 
 	plot(args=GetOptions.parse_known_args()[0])

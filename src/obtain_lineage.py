@@ -26,7 +26,6 @@ def seqid_from_fullid(rec):
     Returns:
         str: sequence id that Entrez API can recognize
     """    
-    
     if rec.id.startswith("UniRef100"):
         splitid = rec.id.split('_')[1]
     elif rec.id.startswith("sp|"):
