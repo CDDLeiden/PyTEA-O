@@ -11,10 +11,9 @@ elif 'win' in sys.platform:
     multiprocessing = 'multiprocessing'
 mp = __import__(multiprocessing) #import multiprocessing as mp
 
-def dictreturn():
+def dictreturn(inputMSA):
     global seqDict
     seqDict = {}
-    inputMSA = 'test_text.txt'
     with open (inputMSA, 'r') as f:
         for i, line in enumerate(f):
             newLine = line.strip()
@@ -188,13 +187,41 @@ def grouping(seqDict, seqMatrix):
     column = 1
     tree[seqMatrix[row,column]/2] = [tree[0]]
 
+    # level = 0
+    tree_red = {}
+    tree_content = {}
+
+    for j, value in enumerate(tree.values()):
+        # print(j)
+        # print(value)
+        for i in range(len(value)):
+            # print(value[i])
+            # print(type(value[i]))
+            if type(value[i])==list:
+                for k in range(len(value[i])):
+                    tree_content[value[i][k]] = hex(i)
+            else:
+                tree_content[value[i]] = hex(i)
+        # print(j, tree_content)
+        content = tree_content.copy()
+        tree_red[j] = content
+    
+    print(tree_red)
+
+            # if ',' in value[i]:
+            #     groups = value[i].split(',')
+            #     for k in range(len(groups)):
+            # else:
+
+
     with open("grouping.txt", 'w') as file:
-        for key, value in tree.items():
+        for key, value in tree_red.items():
             file.write(f"{key}: {value}\n")
 
 
 if __name__ == "__main__":
-    seqDict = dictreturn()
+    input_file = input("file name")
+    seqDict = dictreturn(input_file)
     seqMatrix = seqMreturn()
     with mp.Pool(initializer= worker_init, initargs=(seqDict,seqMatrix), processes = mp.cpu_count()) as executor:
         results = executor.map(differ, seqDict)
