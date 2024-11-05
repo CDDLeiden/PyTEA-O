@@ -1,10 +1,8 @@
 #!/usr/bin/env python3
 
 import os
-import sys
 import time
 import argparse
-import numpy as np
 import pandas as pd
 from Bio import SeqIO
 from Bio import Entrez
