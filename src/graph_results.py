@@ -1,14 +1,35 @@
 #!/usr/bin/env python3
 
 from matplotlib import pyplot as plt
-from random import randint
+from random import sample
 import matplotlib.colors as mcolors
-from matplotlib.ticker import MultipleLocator, AutoMinorLocator
+from matplotlib.ticker import MultipleLocator
+import matplotlib.patches as patches
 from os.path import exists
 from os import makedirs
 from statistics import median, mean
 import numpy as np
-from math import log
+
+def __read_average_entropy_file(average_SE_file:str=None,msa_links:dict=None) -> np.array:
+	
+	if not exists(average_SE_file):
+		print(f"\t\t[W]  Can't open average entropy file located at {average_SE_file}\n\n")
+		return -1
+
+	average_SEs = np.zeros(len(msa_links.keys()))
+	with open(average_SE_file,'r') as IN:
+		for line in IN:
+			line = line.strip()
+			if line == "":
+				continue
+			if line[0] == "#":
+				continue
+			res_num,average = line.split("\t")
+			res_num = int(res_num)
+			if res_num in msa_links.keys():
+				average_SEs[msa_links[res_num]] = float(average)
+
+	return average_SEs
 
 def __read_consensus_file(consensus_file:str=None,data:dict=None,msa_links:dict=None) -> list:
 
@@ -86,18 +107,27 @@ def __read_SE_data(SE_file:str=None) -> list:
 
 			pos,msa_pos,res,se,fse,num_seqs,fog = line.split()
 
-			data[int(pos)+1] = {"RES":res,"SE":abs(float(fse)),"NUM_RES":None,"MSA_POS":msa_pos}
-			msa_links[int(msa_pos)] = int(pos) + 1
+			data[int(pos)] = {"RES":res,"SE":abs(float(fse)),"NUM_RES":None,"MSA_POS":msa_pos}
+			msa_links[int(msa_pos)] = int(pos)
 
 	return data,msa_links
 
 
-def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_graphics', highlight_file:str = None) -> None:
+def plot(args=None) -> None:
+
+	SE_file=args.shannon_entropy_file
+	consensus_file=args.consensus_sequence_file
+	highlight_file=args.highlight_residues
+	average_SE_file=args.average_entropy_file
+	output_dir=args.outdir
 
 	aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
 
 	# Read in Shannon Entropy
 	data,msa_links = __read_SE_data(SE_file=SE_file)
+
+	# Read in Average Shannon Entropy
+	ase_values = __read_average_entropy_file(average_SE_file=average_SE_file,msa_links=msa_links)
 
 	# Read in Concensus Sequence
 	data = __read_consensus_file(consensus_file=consensus_file,data=data,msa_links=msa_links)
@@ -123,18 +153,23 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	####################################################################################################################
 
 	fig = plt.figure()
+
+	plot_rows = 6
+	plot_columns = 1
 	
 	## Specifying plot placements
 	# Shannon Entropy 1st
-	se_graph = plt.subplot2grid((5,1),(0,0))
+	se_graph = plt.subplot2grid((plot_rows,plot_columns),(0,0))
+	# # Specificty/Conservation Scoring
+	scs_graph = plt.subplot2grid((plot_rows,plot_columns),(1,0))
 	# Residue presense matrix 2nd, spans 2 rows
-	res_mat_graph = plt.subplot2grid((5,1),(1,0),rowspan=2)
+	res_mat_graph = plt.subplot2grid((plot_rows,plot_columns),(2,0),rowspan=2)
 	# Number of different residues present at site
 	num_ress = np.zeros(len_of_seq)
-	res_num_graph = plt.subplot2grid((5,1),(3,0))
+	res_num_graph = plt.subplot2grid((plot_rows,plot_columns),(4,0))
 	# Number of sequences belonging to that residue
-	res_dist_graph = plt.subplot2grid((5,1),(4,0))
-	
+	res_dist_graph = plt.subplot2grid((plot_rows,plot_columns),(5,0))
+
 	## Load CSS colors for iterative coloring
 	colors = mcolors.XKCD_COLORS
 	color_keys = [
@@ -149,10 +184,10 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	####################################################################################################################
 
 	# Shannon Entropies for the reference
-	se_values = [data[x]["SE"] for x in res_nums]
+	se_values = np.array([data[x]["SE"] for x in res_nums])
 
 	# Residue and residue number labels
-	labels = [f"{data[x]["RES"]} [{x}]"  if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
+	labels = [f"{data[x]["RES"]} [{x+1}]" if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
 
 	## Expand the graph slightly past the plotted data
 	se_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
@@ -161,15 +196,7 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	# Add separator lines to make residue visualization easier
 	for x in res_nums:
 		se_graph.plot([x-0.5,x-0.5],[-0.5,1.05],color='w',linestyle='-',linewidth=0.75)
-	
-	## Add "Highlighted Entropy Zones"
-	# Green (0.0-0.25)
-	# Yellow (0.25-0.75)
-	# Red (0.75-1.0)
-	se_graph.add_patch(plt.Rectangle((res_nums[0]-1,-0.05),(res_nums[-1]+2),0.3,color='g',alpha=0.1))
-	se_graph.add_patch(plt.Rectangle((res_nums[0]-1,.25),(res_nums[-1]+2),0.5,color='y',alpha=0.1))
-	se_graph.add_patch(plt.Rectangle((res_nums[0]-1,.75),(res_nums[-1]+2),1,color='r',alpha=0.1))
-	
+
 	# Highlight residues with near equal representation in MSA
 	for i,val_x in enumerate(res_nums):
 		num_res = data[val_x]["NUM_RES"]
@@ -180,17 +207,13 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 			continue
 		se_graph.plot(val_x,data[val_x]["SE"],marker="*",markersize=10*(1-data[val_x]["DEV"]),color='b')
 
-	## Highlight user-given residues
-	if exists(highlight_file):
-		used_colors = []
-		for source in highlights.keys():
-			color = colors[f"xkcd:{color_keys[randint(0,len(color_keys)-1)]}"]
-			while color in used_colors:
-				if sorted(used_colors) == sorted(color_keys):
-					used_colors = []
-			for val_x in highlights[source]:
-				se_graph.add_patch(plt.Rectangle((val_x-0.5,-0.05),1,1.2,facecolor=color,edgecolor="None"))
-				used_colors.append(color)
+	## Add "Highlighted Entropy Zones"
+	# Green (0.0-0.25)
+	# Yellow (0.25-0.75)
+	# Red (0.75-1.0)
+	se_graph.add_patch(plt.Rectangle((res_nums[0]-1,-0.05),(res_nums[-1]+2),0.3,color='g',alpha=0.1))
+	se_graph.add_patch(plt.Rectangle((res_nums[0]-1,.25),(res_nums[-1]+2),0.5,color='y',alpha=0.1))
+	se_graph.add_patch(plt.Rectangle((res_nums[0]-1,.75),(res_nums[-1]+2),1,color='r',alpha=0.1))
 
 	## Plot the data
 	se_graph.plot(res_nums,se_values,linewidth=0.5,color='k')
@@ -202,9 +225,64 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	se_graph.tick_params(axis='x',which='both',bottom=False,labelbottom=False)
 	se_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
 	se_graph.spines['bottom'].set_visible(False)
+
+	# ase_graph = se_graph.twinx()
+	se_graph.plot(res_nums,[ase_values[x] for x in res_nums],linewidth=0.5,color='b')
+
 	axt = se_graph.secondary_xaxis('top')
 	axt.set_xticks(res_nums)
 	axt.set_xticklabels(labels,font='monospace',fontsize=font_size,ha='center',va='bottom',rotation='vertical')
+
+	####################################################################################################################
+	## Specificity/Conservation Scoring
+	####################################################################################################################
+
+	rotate_deg = np.deg2rad(45)
+	sin_val = np.sin(rotate_deg)
+	cos_val = np.cos(rotate_deg)
+	off = 0.5
+	ase_values = ase_values
+	h = np.sqrt(np.square(ase_values)+np.square(se_values))
+	cons = np.zeros(h.shape)
+	np.seterr(divide='ignore',invalid='ignore')
+	cons = -h*np.cos(np.arccos(ase_values/h)-rotate_deg)
+	np.nan_to_num(cons,copy=False)
+	cons += off
+	spec_dist = np.sqrt(np.square(ase_values)+np.square(np.subtract(se_values,1)))
+
+	for index,x in enumerate(res_nums):
+		# scs_graph.plot(x,cons[index],markersize=5*(1-spec_dist[index]),marker='s',color='orange')
+		start_y = cons[index] if cons[index] < 0 else 0
+		length_y = abs(cons[index])
+		rect_width = 1-spec_dist[index]
+		rect_start = x - (0.5*rect_width)
+		scs_graph.add_patch(plt.Rectangle((rect_start,start_y),rect_width,length_y,facecolor='b',edgecolor='b'))
+
+	###########################################################
+	## Hightlight user-provided residues
+	###########################################################
+
+	if exists(highlight_file):
+		rand_colors = sample(range(len(color_keys)),len(highlights.keys()))
+		for index,source in enumerate(highlights.keys()):
+			for val_x in highlights[source]:
+				scs_graph.add_patch(plt.Rectangle((val_x-0.5,-0.6),1,1.2,facecolor=colors[f'xkcd:{color_keys[rand_colors[index]]}'],edgecolor="None",zorder=0,alpha=0.25))
+
+
+	# Set and rotate major tick labels
+	labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
+	scs_graph.xaxis.set_ticks([i for i in res_nums])
+	scs_graph.tick_params(axis='x',which='both',bottom=False,labelbottom=False,top=False,labeltop=False)
+	scs_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
+	scs_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
+	scs_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
+	scs_graph.spines['bottom'].set_visible(False)
+	scs_graph.spines['top'].set_visible(False)
+	scs_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	scs_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
+	scs_graph.set_xticks(res_nums)
+	scs_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
+	scs_graph.set_ylim([-0.65,0.65])
 
 	####################################################################################################################
 	## Residue Presence Matrix
@@ -227,9 +305,9 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 
 	## Setup X-Axis
 	# Set major tick for each residue [0 to pos-1]
-	res_mat_graph.xaxis.set_ticks([i-1 for i in res_nums])
+	res_mat_graph.xaxis.set_ticks([i-1 for i in range(len(res_nums)+1)])
 	# Set and rotate major tick labels
-	labels = [f"{val_x: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
+	labels = [f"{val_x: >{len(str(len_of_seq))+1}}" if val_x%2 == 0 else "" for val_x in range(len(res_nums)+1)]
 	res_mat_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
 	# Show major tick labels, but not the ticks themselves, and only on the top
 	res_mat_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=True,labelbottom=False)
@@ -245,6 +323,7 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 
 	# Turn on X-axis gridlines using the minor ticks
 	res_mat_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
+	res_mat_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
 
 	####################################################################################################################
 	## Number of Residue Bar Graph
@@ -256,6 +335,7 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	# Set major tick for each residue [0 to pos-1]
 	res_num_graph.xaxis.set_ticks([i for i in res_nums])
 	# Set and rotate major tick labels
+	labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
 	res_num_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
 	res_num_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
 
@@ -313,7 +393,7 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	rdg_bt = res_dist_graph.secondary_xaxis("bottom")
 	rdg_bt.set_xticks([i for i in res_nums])
 	rdg_bt.tick_params(which='both',bottom=False)
-	labels = [f"[{x}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
+	labels = [f"[{x+1}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
 	rdg_bt.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size)
 
 	## Setup Y-Axis
@@ -327,14 +407,9 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	file_prefix = SE_file.split("/")[-1].split(".")[0]
 	makedirs(output_dir,mode=0o755,exist_ok=True)
 	fig.set_size_inches(width,10)
+	plt.tight_layout()
 	plt.savefig(f"{output_dir}/{file_prefix}.png",dpi=500)
 	
-	return None
-
-def run(args=None) -> None:
-
-	plot(SE_file=args.shannon_entropy_file,consensus_file=args.consensus_sequence_file,highlight_file=args.highlight_residues,output_dir=args.outdir)
-
 	return None
 
 if __name__ == "__main__":
@@ -349,4 +424,4 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-c","--consensus_sequence_file",required=False,type=str)
 	GetOptions.add_argument("-a","--average_entropy_file",required=False)
 
-	run(GetOptions.parse_known_args()[0])
+	plot(args=GetOptions.parse_known_args()[0])
