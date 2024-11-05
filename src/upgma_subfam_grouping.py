@@ -220,7 +220,7 @@ def grouping(seqDict, seqMatrix):
 
 
 if __name__ == "__main__":
-    input_file = input("file name")
+    input_file = input("file name: ")
     seqDict = dictreturn(input_file)
     seqMatrix = seqMreturn()
     with mp.Pool(initializer= worker_init, initargs=(seqDict,seqMatrix), processes = mp.cpu_count()) as executor:
