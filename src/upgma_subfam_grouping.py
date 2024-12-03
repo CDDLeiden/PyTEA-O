@@ -204,6 +204,8 @@ def grouping(seqDict, seqMatrix):
         for i in range(len(value)):
             # print(value[i])
             # print(type(value[i]))
+            print(value[i])
+            print("##################")
             if type(value[i])==list:
                 for k in range(len(value[i])):
                     tree_content[value[i][k]] = hex(i)
@@ -218,11 +220,13 @@ def grouping(seqDict, seqMatrix):
             file.write(grouping_line+"\n")
     # print(content)
     # print(tree_red)
-    
 
 if __name__ == "__main__":
-    input_file = input("file name: ")
+    # input_file = input("file name: ")
+    input_file = "/home/rosan/git/GitHub_TEAO/TESTDATA/clustalo-I20241105-185023-0090-80937107-p1m.aln-clustal"
     seqDict = dictreturn(input_file)
+    for key, value in seqDict.items():
+        print(key, value)
     seqMatrix = seqMreturn()
     with mp.Pool(initializer= worker_init, initargs=(seqDict,seqMatrix), processes = mp.cpu_count()) as executor:
         results = executor.map(differ, seqDict)
