@@ -123,7 +123,14 @@ def __read_zscale_data(zscale_file:str=None) -> dict:
 		data[int(row['MSA_position']) +1] = [row['Z1'], row['Z2'], row['Z3'], row['Z4'], row['Z5']]
 	return data
 
-def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_graphics', highlight_file:str = None, zscale_file:str = None) -> None:
+def plot(args=None) -> None:
+
+	SE_file=args.shannon_entropy_file
+	consensus_file=args.consensus_sequence_file
+	highlight_file=args.highlight_residues
+	average_SE_file=args.average_entropy_file
+	zscale_file=args.zscale_file
+	output_dir=args.outdir
 
 	aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
 	scales = ['Z1','Z2','Z3']
@@ -162,7 +169,7 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 
 	fig = plt.figure()
 
-	plot_rows = 6
+	plot_rows = 7
 	plot_columns = 1
 	
 	## Specifying plot placements
@@ -177,6 +184,8 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	res_num_graph = plt.subplot2grid((plot_rows,plot_columns),(4,0))
 	# Number of sequences belonging to that residue
 	res_dist_graph = plt.subplot2grid((plot_rows,plot_columns),(5,0))
+	# Z-scale distribution
+	zscale_graph = plt.subplot2grid((plot_rows,plot_columns),(6,0))
 
 	se_graph = plt.subplot2grid((6,1),(0,0))
 	# Residue presense matrix 2nd, spans 2 rows
@@ -207,8 +216,8 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	se_values = np.array([data[x]["SE"] for x in res_nums])
 
 	# Residue and residue number labels
-	# labels = [f"{data[x]["RES"]} [{x}]"  if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
-	labels = [f"{data[x]['RES']} [{x}]" if x % 2 != 0 else f"{data[x]['RES']}" for x in res_nums]
+	# labels = [f"{data[x]["RES"]} [{x+1}]" if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
+	labels = [f"{data[x]['RES']} [{x+1}]" if x%2 != 0 else f"{data[x]['RES']}" for x in res_nums]
 
 	## Expand the graph slightly past the plotted data
 	se_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
@@ -299,7 +308,7 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	scs_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
 	scs_graph.spines['bottom'].set_visible(False)
 	scs_graph.spines['top'].set_visible(False)
-	scs_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+	scs_graph.xaxis.set_minor_locator(MultipleLocator(1))
 	scs_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
 	scs_graph.set_xticks(res_nums)
 	scs_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
@@ -418,8 +427,8 @@ def plot(SE_file:str = None, consensus_file:str = None, output_dir: str = 'SE_gr
 	rdg_bt = res_dist_graph.secondary_xaxis("bottom")
 	rdg_bt.set_xticks([i for i in res_nums])
 	rdg_bt.tick_params(which='both',bottom=False)
-	# labels = [f"[{x}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
-	labels = [f"[{x}] {data[x]['CON_RES']}" if x % 2 != 0 else data[x]['CON_RES'] for x in res_nums]
+	# labels = [f"[{x+1}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
+	labels = [f"[{x+1}] {data[x]['CON_RES']}" if x%2 != 0 else data[x]['CON_RES'] for x in res_nums]
 	rdg_bt.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size)
 
 	## Setup Y-Axis
