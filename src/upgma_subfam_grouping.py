@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import numpy as np
 from datetime import datetime
 import sys
@@ -52,8 +54,8 @@ def differ(output):
     for index, key in enumerate(dictionary.keys()):
         if key == output:
             i = index
-            print(output)
-            print(i)
+            # print(output)
+            # print(i)
     # return(i)
     # input()
     
@@ -79,7 +81,7 @@ def differ(output):
             # print(row)
 
 
-            print(f"{i}and {j} Done!")
+            # print(f"{i}and {j} Done!")
     return row
         
 def worker_init(seqdict, seqmatrix):
@@ -107,7 +109,7 @@ def grouping(seqDict, seqMatrix):
 
     start_time = datetime.now()
     while(len(seqMatrix)>2):
-        print(len(seqMatrix))
+        # print(len(seqMatrix))
         row = 0
         m = len(seqMatrix)
         index = np.argmin(seqMatrix[seqMatrix>-1])
@@ -206,7 +208,7 @@ def grouping(seqDict, seqMatrix):
         content = tree_content.copy()
         tree_red[j] = content
     
-    print(tree_red)
+    # print(tree_red)
 
             # if ',' in value[i]:
             #     groups = value[i].split(',')
@@ -225,11 +227,11 @@ if __name__ == "__main__":
     seqMatrix = seqMreturn()
     with mp.Pool(initializer= worker_init, initargs=(seqDict,seqMatrix), processes = mp.cpu_count()) as executor:
         results = executor.map(differ, seqDict)
-    print("this is result")
+    # print("this is result")
     # print(results)
     # print(type(results))
     matrix = np.array(results)
-    print(matrix)
+    # print(matrix)
     # print(seqDict)
 
     grouping(seqDict, matrix)
