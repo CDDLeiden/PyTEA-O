@@ -99,7 +99,11 @@ def grouping(seqDict, seqMatrix):
     location = []
     for i in range(0,len(original_seqM)):
         location.append([i])
-    
+
+    with open("grouping.txt", "w") as file:
+        first_line = "## " + ";".join(key_list) + "\n"
+        file.write(first_line)
+
     #newick dictionary
     # newick = {}
 
@@ -207,19 +211,13 @@ def grouping(seqDict, seqMatrix):
         # print(j, tree_content)
         content = tree_content.copy()
         tree_red[j] = content
-    
+        grouping_list = list(content.values())
+        grouping_line = ";".join(grouping_list)
+        with open("grouping.txt", 'a') as file:
+            file.write(grouping_line+"\n")
+    # print(content)
     # print(tree_red)
-
-            # if ',' in value[i]:
-            #     groups = value[i].split(',')
-            #     for k in range(len(groups)):
-            # else:
-
-
-    with open("grouping.txt", 'w') as file:
-        for key, value in tree_red.items():
-            file.write(f"{key}: {value}\n")
-
+    
 
 if __name__ == "__main__":
     input_file = input("file name: ")
