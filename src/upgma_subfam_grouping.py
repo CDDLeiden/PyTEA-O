@@ -164,6 +164,7 @@ def grouping(seqDict, seqMatrix):
         arr2 = np.insert(arr2, 0, -1, axis = 1) #(arr, obj, values, axis)
         arr2 = np.insert(arr2, 0, -1, axis = 0)
 
+
         new_name = location[row]+location[column]
         location.insert(0,new_name)
 
