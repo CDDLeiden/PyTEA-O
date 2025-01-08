@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+import argparse
 import numpy as np
 from datetime import datetime
-import sys
 
 multiprocessing = None
 if 'linux' in sys.platform:
@@ -11,7 +13,7 @@ elif 'darwin' in sys.platform:
     multiprocessing = 'multiprocess'
 elif 'win' in sys.platform:
     multiprocessing = 'multiprocessing'
-mp = __import__(multiprocessing) #import multiprocessing as mp
+mp = __import__(multiprocessing) # Import multiprocessing as mp
 
 def dictreturn(inputMSA):
     global seqDict
@@ -39,49 +41,25 @@ def seqMreturn():
     for i in range(0, len(seqMatrix)):
         for j in range(0, len(seqMatrix)):
             seqMatrix[i,j] = -1
-    # print("empty matrix done!")
     end_time = datetime.now()
 
     print(end_time-start_time)
     return seqMatrix
-    # print(seqDict)
 
 def differ(output):
-    # input()
-
     row = [-1 for i in range(len(dictionary))]
-
     for index, key in enumerate(dictionary.keys()):
         if key == output:
             i = index
-            # print(output)
-            # print(i)
-    # return(i)
-    # input()
-    
+
     for j, value2 in enumerate(dictionary.values()):
-        # print(value2)
         if i<j :
             difference = 0
             for k in range(len(value2)):
-                # print(dictionary[output][k])
-                # input()
                 if value2[k] != dictionary[output][k]:
                     difference += 1
-            # print("this is difference")
-            # print(difference)
-            # input()
-            # print("this is ij")
-            # print(i, j)
-            # print("this is  ij")
-             
+        
             row[j] = difference
-            
-            # print("this is matrix update")
-            # print(row)
-
-
-            # print(f"{i}and {j} Done!")
     return row
         
 def worker_init(seqdict, seqmatrix):
@@ -89,9 +67,8 @@ def worker_init(seqdict, seqmatrix):
     dictionary = seqdict
     global matrix
     matrix = seqmatrix
-    # print(dictionary)
 
-def grouping(seqDict, seqMatrix):
+def grouping(seqDict, seqMatrix, outfile):
     key_list = []
     for i, keys in enumerate(seqDict.keys()):
         key_list.append(keys)
@@ -100,12 +77,9 @@ def grouping(seqDict, seqMatrix):
     for i in range(0,len(original_seqM)):
         location.append([i])
 
-    with open("grouping.txt", "w") as file:
+    with open(outfile, "w") as file:
         first_line = "## " + ";".join(key_list) + "\n"
         file.write(first_line)
-
-    #newick dictionary
-    # newick = {}
 
     tree = {
         0 : key_list.copy()
@@ -113,13 +87,11 @@ def grouping(seqDict, seqMatrix):
 
     start_time = datetime.now()
     while(len(seqMatrix)>2):
-        # print(len(seqMatrix))
         row = 0
         m = len(seqMatrix)
         index = np.argmin(seqMatrix[seqMatrix>-1])
         while(index-(m-row-1)>=0): 
             index -= (m-row)-1
-            # print(index)
             row += 1
         column = 1
         while(index-1>=0):
@@ -128,21 +100,16 @@ def grouping(seqDict, seqMatrix):
         column += row
     
         #make newick format
-        key1 = key_list[row] #name in the (row)th value of key list
-        key2 = key_list[column] # name in the (column)th value of the key list
+        key1 = key_list[row] # Name in the (row)th value of key list
+        key2 = key_list[column] # Name in the (column)th value of the key list
         length = seqMatrix[row, column]/2
         
-        # new_newick = "{},{}".format(key1, key2) #name of the key
-        # newick[new_newick] = {key1: length,
-        #                       key2: length}    
-
         new_key = "{},{}".format(key1, key2)
 
         del key_list[column]
         del key_list[row]
 
         key_list.insert(0,new_key)
-
         '''
         this is for teao
         '''
@@ -150,10 +117,9 @@ def grouping(seqDict, seqMatrix):
         for i in range(len(teao_list)):
             if ',' in teao_list[i]:
                 teao_list[i] = teao_list[i].split(',')
-        # print(teao_list)
         tree[length] = teao_list
 
-#make new array and update it
+        # Make new array and update it
         arr2 = seqMatrix
         arr2 = np.delete(arr2, column, axis = 0)
         arr2 = np.delete(arr2, column, axis = 1)
@@ -161,7 +127,7 @@ def grouping(seqDict, seqMatrix):
         arr2 = np.delete(arr2, row, axis = 0)
         arr2 = np.delete(arr2, row, axis = 1)
         
-        arr2 = np.insert(arr2, 0, -1, axis = 1) #(arr, obj, values, axis)
+        arr2 = np.insert(arr2, 0, -1, axis = 1) # (arr, obj, values, axis)
         arr2 = np.insert(arr2, 0, -1, axis = 0)
 
 
@@ -176,20 +142,16 @@ def grouping(seqDict, seqMatrix):
             for m in range(0, len(location[0])): # [abc]
                 for k in range(0, len(location[l])): # [de],[f],[g]
                     if (location[0])[m] > (location[l])[k]:
-                        # sum1 += original_seqM[k,m]
                         sum1 += original_seqM[(location[l])[k], (location[0])[m]]
                     else:
-                        # sum1 += original_seqM[m,k]
                         sum1 += original_seqM[(location[0])[m],(location[l])[k]]
-                        # print((location[0])[k],(location[l])[m])
                     arr2[0,l] = sum1/((len(location[0]))*(len(location[l])))
 
         seqMatrix = arr2
-        # print(seqMatrix)
     end_time = datetime.now()
     print(end_time-start_time)
     
-    # final newick
+    # Final newick
     row = 0
     column = 1
     tree[seqMatrix[row,column]/2] = [tree[0]]
@@ -199,42 +161,67 @@ def grouping(seqDict, seqMatrix):
     tree_content = {}
 
     for j, value in enumerate(tree.values()):
-        # print(j)
-        # print(value)
         for i in range(len(value)):
-            # print(value[i])
-            # print(type(value[i]))
-            print(value[i])
-            print("##################")
             if type(value[i])==list:
+                # print(value[i])
                 for k in range(len(value[i])):
-                    tree_content[value[i][k]] = hex(i)
+                    # print(value[i][k])
+                    if type(value[i][k])==str:
+                        tree_content[value[i][k]] = hex(i)
+                    # TODO Check why this is a list in some cases
+                    elif type(value[i][k])==list:
+                        print(value[i][k])
+                        tree_content[str(value[i][k])] = hex(i)
             else:
+                # print(value[i])
                 tree_content[value[i]] = hex(i)
-        # print(j, tree_content)
         content = tree_content.copy()
         tree_red[j] = content
         grouping_list = list(content.values())
         grouping_line = ";".join(grouping_list)
-        with open("grouping.txt", 'a') as file:
+        with open(outfile, 'a') as file:
             file.write(grouping_line+"\n")
-    # print(content)
-    # print(tree_red)
 
-if __name__ == "__main__":
-    # input_file = input("file name: ")
-    input_file = "/home/rosan/git/GitHub_TEAO/TESTDATA/clustalo-I20241105-185023-0090-80937107-p1m.aln-clustal"
-    seqDict = dictreturn(input_file)
-    for key, value in seqDict.items():
-        print(key, value)
+def check_input(inputMSA):
+    """Check whether the input MSA is in CLUSTAL format"""
+    extension = os.path.splitext(inputMSA)[1]
+    if extension != ".clustal":
+        print("Error: Input MSA is not in CLUSTAL format")
+        sys.exit(1)
+    with open(inputMSA, 'r') as f:
+        first_line = f.readline()
+        if "CLUSTAL" not in first_line:
+            print("Error: Input MSA is not in CLUSTAL format")
+            sys.exit(1)    
+
+def main(args):
+
+    check_input(args.msa)
+    seqDict = dictreturn(args.msa)
+    # print(seqDict)
     seqMatrix = seqMreturn()
+    # print(seqMatrix)
+    # print(len(seqDict))
+    # print(len(seqMatrix))
+
     with mp.Pool(initializer= worker_init, initargs=(seqDict,seqMatrix), processes = mp.cpu_count()) as executor:
         results = executor.map(differ, seqDict)
-    # print("this is result")
-    # print(results)
-    # print(type(results))
     matrix = np.array(results)
-    # print(matrix)
-    # print(seqDict)
 
-    grouping(seqDict, matrix)
+    # Create output filename
+    basename = os.path.splitext(args.msa)[0]
+    outname = os.path.join(basename + "_grouping.txt")
+
+    grouping(seqDict, matrix, outname)
+    print("Grouping subfamilies based on UPGMA clustering is done. Output file is saved as:", outname)
+
+
+if __name__ == '__main__':
+
+    parser = argparse.ArgumentParser(description="""Grouping subfamilies based on UPGMA clustering. Input is a Multiple Sequence Alignment (CLUSTAL format)
+                                                    and the output is a text file containing the subfamily grouping. The output file is named as 
+                                                    <input_filename>_grouping.txt""")
+    parser.add_argument("-m", "--msa", required=True, help="file location of Multiple Sequence Alignment (CLUSTAL format)")
+    args = parser.parse_args()
+
+    main(args)

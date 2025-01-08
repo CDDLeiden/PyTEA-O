@@ -245,8 +245,6 @@ def run(args:dict) -> None:
 
 	# Load and make sure all sequences in the MSA have the same length before starting calculations
 	msas = load_msa(path_msa)
-	print(msas)
-	print(msas.shape)
 
 	n_seq, n_res = msas.shape
 	msa_buffer = len(str(n_res))
@@ -307,7 +305,6 @@ def run(args:dict) -> None:
 		if exists(temp_file):
 			with open(temp_file,'r') as TEMP:
 				for line_count,line in enumerate(TEMP):
-					print(f"Line: {line}, Line Count: {line_count}")
 					if line_count < total_branch_points - 1:
 						SEs[line_count] = np.fromstring(line,dtype=float,sep=';')
 						previous_branch_points += 1
@@ -324,7 +321,6 @@ def run(args:dict) -> None:
 			max_time = np.NINF
 			min_time = np.PINF
 			for line in IN:
-				print(f"line: {line}\n")
 				line = line.strip()
 				
 				if line == "":
@@ -337,14 +333,11 @@ def run(args:dict) -> None:
 				
 				families = {}
 				for index,family in enumerate(line.split(";")):
-					print(f"Index {index}: Family {family} \n")
+
 					if family not in families.keys():
 						families[family] = []
+
 					families[family].append(indexes[index])
-					# families[family].append(index)
-			
-				for k,v in families.items():
-					print(f"K {k}: V {v}")
 
 				## Iterate over each subfamily
 				start = time()
@@ -450,7 +443,7 @@ def main(args):
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='')
-	parser.add_argument("-m", "--msapath", required=True, help="file location of Multiple Sequence Alignment (FASTA format)")
+	parser.add_argument("-m", "--msapath", required=True, help="file location of Multiple Sequence Alignment (oneliner format)")
 	parser.add_argument("-s", "--subfamilypath", help="file location of subfamily assignment (TXT file)")
 	parser.add_argument("-o", "--outpath", required=True, help="output file location")
 	parser.add_argument("-r", "--reference_ids", required=False, help="reference ID(s).", nargs="+")
