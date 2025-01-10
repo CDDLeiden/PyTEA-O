@@ -17,11 +17,13 @@ class Analyse:
     """
 
     def __init__(self):
+        self.mode = None
         self.se_folder = None
         self.reference = None
 
         self.gap_data = False  # Do not include gap data for plotting
         self.global_entropy_file = 'shannon_entropy.txt'
+        self.summed_entropy_file = 'summed_subfamily_shannon_entropy.txt'
         self.average_entropy_file = 'average_shannon_entropy.txt'
         self.residue_counts_file = 'residue_counts.txt'
 
@@ -30,9 +32,12 @@ class Analyse:
     def read_data(self):
         if self.reference:
             self.read_reference()
+        if self.mode == "TEA":
+            self.read_summed_entropy()
+        elif self.mode == "TEAO":
+            self.read_average_entropy()
         self.read_global_entropy()
-        self.read_average_entropy()
-
+        
         if not self.gap_data: # Remove gap positions
             gap_positions = [num for num, val in enumerate(self.data['residues']) if val == "-"]
             for index in sorted(gap_positions, reverse=True):
@@ -88,6 +93,17 @@ class Analyse:
         self.data['average_entropy'] = average_entropy
 
 
+    def read_summed_entropy(self):
+        summed_entropy = []
+        with open(os.path.join(self.se_folder, self.summed_entropy_file), 'r') as f:
+            content = f.readlines()
+            for line in content:
+                line = line.strip().split()
+                SE_sum = float(line[1])
+                summed_entropy.append(SE_sum)
+        self.data['summed_entropy'] = summed_entropy
+
+
     def read_reference(self):
         residues = []
         residues_MSA_positions = []
@@ -112,22 +128,34 @@ class Plot:
     """
     Create some of the plots for the TEA analysis
     """
-    def __init__(self, data):
+    def __init__(self, data, mode):
         self.data = data
+        self.mode = mode
 
     def global_vs_subfam(self, figsize=(5, 5)):
         f, ax = plt.subplots(figsize=figsize)
-        ax.scatter(self.data['average_entropy'], self.data['global_entropy'])
-        ax.set_xlabel('Averafe subfamily entropy')
+        if self.mode == "TEA":
+            ax.scatter(self.data['summed_entropy'], self.data['global_entropy'])
+        elif self.mode == "TEAO":
+            ax.scatter(self.data['average_entropy'], self.data['global_entropy'])
+        ax.set_xlabel('Average subfamily entropy')
         ax.set_ylabel('Global entropy')
         ax.legend()
         return f, ax
     
     def global_vs_subfam_interactive(self, width=800, height=800):
-        fig = px.scatter(x=self.data['average_entropy'], 
-                 y=self.data['global_entropy'],
-                 hover_name=self.data['residues'],
-                 width=width,
-                 height=height)
-        fig.update_layout(title='Average vs Global subfamily entropy', xaxis_title='Global entropy', yaxis_title='Average subfamily entropy')
+        if self.mode == "TEAO":
+            fig = px.scatter(x=self.data['average_entropy'], 
+                    y=self.data['global_entropy'],
+                    hover_name=self.data['residues'],
+                    width=width,
+                    height=height)
+            fig.update_layout(title='Average vs Global subfamily entropy', xaxis_title='Global entropy', yaxis_title='Average subfamily entropy')
+        elif self.mode == "TEA":
+            fig = px.scatter(x=self.data['summed_entropy'], 
+                    y=self.data['global_entropy'],
+                    hover_name=self.data['residues'],
+                    width=width,
+                    height=height)
+            fig.update_layout(title='Summed vs Global subfamily entropy', xaxis_title='Global entropy', yaxis_title='Summed subfamily entropy')
         return fig

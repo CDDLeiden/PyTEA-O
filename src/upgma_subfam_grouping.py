@@ -168,9 +168,9 @@ def grouping(seqDict, seqMatrix, outfile):
                     # print(value[i][k])
                     if type(value[i][k])==str:
                         tree_content[value[i][k]] = hex(i)
-                    # TODO Check why this is a list in some cases
-                    elif type(value[i][k])==list:
+                    elif type(value[i][k])==list:  # Duplicate sequences
                         print(value[i][k])
+                        sys.exit()
                         tree_content[str(value[i][k])] = hex(i)
             else:
                 # print(value[i])
@@ -198,11 +198,8 @@ def main(args):
 
     check_input(args.msa)
     seqDict = dictreturn(args.msa)
-    # print(seqDict)
+
     seqMatrix = seqMreturn()
-    # print(seqMatrix)
-    # print(len(seqDict))
-    # print(len(seqMatrix))
 
     with mp.Pool(initializer= worker_init, initargs=(seqDict,seqMatrix), processes = mp.cpu_count()) as executor:
         results = executor.map(differ, seqDict)
