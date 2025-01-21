@@ -16,8 +16,12 @@ def calculate_protein_descriptor(aligned_sequences:list, descriptor:str) -> pd.D
 	Calculate protein descriptors based on a list of aligned sequences
 	"""
 	desc_factory = ProteinDescriptors()
+	print(f"Calculating {descriptor} descriptor")
 	prodec_descriptor = desc_factory.get_descriptor(descriptor)
-	result = prodec_descriptor.pandas_get(aligned_sequences)
+	print(f"Descriptor: {prodec_descriptor}")
+	# result = prodec_descriptor.pandas_get(aligned_sequences, gaps='omit')
+	result = prodec_descriptor.pandas_get(aligned_sequences, gaps=0.0)
+	print(f"Result: {result}")
 	return result
 
 def read_alignment(fp, extension="fasta"):
@@ -63,19 +67,34 @@ def get_residues_per_position(msa):
 
 def run(args=None):
 
+	zscales_file = 'zscales.txt'
+
 	# Create output directory
 	if not os.path.exists(args.outdir):
 		os.makedirs(args.outdir)
 	
 	# desc_factory = ProteinDescriptors()
 	msa = read_alignment(args.msa_file)
+	print(f"MSA length: {len(msa)}")
+
 	# Get positions from the msa
 	positions = get_residues_per_position(msa)
+	# print(f"Positions: {len(positions)}")
+	# print(f"Positions: {positions}")
+
 	# Calculate Z-scales
 	truncated_sequences = []
 	for _, v in positions.items():
 		truncated_sequences.append(''.join(v))
+	print(f"Truncated sequences: {len(truncated_sequences[0])}")
+	# print(f"Truncated sequences: {truncated_sequences}")
+
+	# Check for unknown amino acids
+	truncated_sequences = [''.join([aa if aa in 'ACDEFGHIKLMNPQRSTVWY' else '-' for aa in seq]) for seq in truncated_sequences]
+
 	z_scales = calculate_protein_descriptor(truncated_sequences, 'Zscale Sandberg')
+	print(f"Z-scales: {len(z_scales)}")
+
 	# Replace the 0s (gaps) by NaN
 	z_scales.replace(0, np.nan, inplace=True)
 	# Calculate std for each z-scale
@@ -96,22 +115,16 @@ def run(args=None):
 	msa_positions = [i for i in range(len(msa[0].seq))]
 	z_scales_scaled = z_scales_scaled.apply(pd.to_numeric, errors='coerce')
 	z_scales_scaled['MSA_position'] = msa_positions
+	print(f"Z-scales scaled: {z_scales_scaled}")
+	print(f"Z-scales scaled columns: {z_scales_scaled['MSA_position']}")
+
 
 	# Save Zscales to file
-	z_scales_scaled.to_csv(f'{args.outdir}/zscales.txt', index=False, sep='\t')
+	with open(f"{args.outdir}/{zscales_file}",'w') as OUT:
+		OUT.write(f"## MSA_position\tZ1\tZ2\tZ3\tZ4\tZ5\n")
+		for _, row in z_scales_scaled.iterrows():
+			OUT.write(f"{int(row['MSA_position'])}\t{row['Z1']}\t{row['Z2']}\t{row['Z3']}\t{row['Z4']}\t{row['Z5']}\n")
 
-	if args.shannon_entropy_file:
-		# Read shannon entropy file
-		shannon_entropy = pd.read_csv(args.shannon_entropy_file, sep='\t')
-		se_msa_positions = shannon_entropy['MSA_Pos'].tolist()
-		se_res = shannon_entropy['Residue'].tolist()
-		se_seq_pos = shannon_entropy['## Sequence_Pos'].tolist()
-		# Only keep the positions that are in the shannon entropy file
-		z_scales_scaled = z_scales_scaled[z_scales_scaled['MSA_position'].isin(se_msa_positions)]
-		z_scales_scaled['Residue'] = se_res
-		z_scales_scaled['Sequence_Pos'] = se_seq_pos
-		seqid = args.shannon_entropy_file.split('/')[-1].split('.')[0]
-		z_scales_scaled.to_csv(f'{args.outdir}/{seqid}.zscales.txt', index=False, sep='\t')
 
 if __name__ == "__main__":
 
@@ -122,7 +135,5 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-m","--msa_file",required=True)
 	GetOptions.add_argument("-o","--outdir",required=False,type=str,default="zscales")
 	GetOptions.add_argument("-d","--descriptors",required=False,default='Zscale Sandberg')
-	GetOptions.add_argument("-s","--shannon_entropy_file",required=False,default=None)
-	# GetOptions.add_argument("-r","--reference_id",required=False,default=None)
 
 	run(GetOptions.parse_known_args()[0])

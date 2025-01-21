@@ -234,9 +234,13 @@ async def convert(file_chunk=None,accession_set:set=None,a2tax_links:dict=None):
 		if line == "":
 			continue
 		accession,taxid = line.strip().split("\t")
+		# print(f"Accession: {accession} | TaxID: {taxid}"
 		if accession in accession_set:
-			a2tax_links[accession] = taxid
-			accession_set.discard(accession)
+			try:
+				a2tax_links[accession] = taxid
+				accession_set.discard(accession)
+			except:
+				pass
 
 	return a2tax_links
 
@@ -323,9 +327,29 @@ def group_accessions(
 		outdir:str="TaxonomyGrouping",
 	) -> None:
 
-	"""
-	
-	"""
+	from time import time
+
+	database_files = setup_db()
+	nodes_links = load_nodes(nodes_file=database_files['nodes'])
+	accession_set = get_sequence_accessions(msa_file=args.msa)
+
+	start = time()
+
+	a2tax_links = {}
+
+	run(
+		link_accessions_to_taxids(
+			a2tax_file=database_files['a2tax'],
+			accession_set=accession_set,
+			max_chunks=args.num_chunks,
+			chunk_size=args.chunk_size*(1024**2)
+		)
+	)
+
+	# with open("test.txt",'r') as IN:
+	# 	for line in IN:
+	# 		accession,taxid = line.strip().split("\t")
+	# 		a2tax_links[accession] = int(taxid)
 
 	taxonomy = {}
 
