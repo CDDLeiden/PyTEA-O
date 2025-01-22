@@ -132,7 +132,7 @@ if __name__ == "__main__":
 
 	GetOptions = ArgumentParser()
 
-	GetOptions.add_argument("-m","--msa_file",required=True)
+	GetOptions.add_argument("-m","--msa_file",required=True,help="MSA in .fasta format")
 	GetOptions.add_argument("-o","--outdir",required=False,type=str,default="zscales")
 	GetOptions.add_argument("-d","--descriptors",required=False,default='Zscale Sandberg')
 

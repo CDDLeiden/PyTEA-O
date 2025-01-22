@@ -25,7 +25,8 @@ import sys
 import matplotlib.gridspec as gridspec
 
 
-
+# TODO Remove Y-labels for subplots not on the left
+# TODO Option to sort/rank residues
 
 class Analyse:
 	"""
@@ -38,6 +39,7 @@ class Analyse:
 		self.se_folder = None
 		self.reference = None
 		self.highlights_file = None
+		self.subset_file = None
 
 		self.SE_file = 'shannon_entropy.txt'
 		self.average_SE_file = 'average_shannon_entropy.txt'
@@ -49,12 +51,13 @@ class Analyse:
 		self.average_SEs: np.array = None
 		self.summed_SEs: np.array = None
 		self.highlights = None
+		self.subset = None
 		self.msa_links = {}
 
 	def read_data(self):
 		self.read_SE_data()
 		self.read_consensus_file()
-		self.read_zscale_file() # TODO make optional
+		self.read_zscale_file()
 	
 		if self.mode == "TEA":
 			self.summed_SEs = self.read_summed_entropy_file()
@@ -64,7 +67,10 @@ class Analyse:
 
 		if self.highlights_file:
 			self.highlights = self.read_res_highlight_file(self.highlights_file)
-		
+
+		if self.subset_file:
+			self.subset = self.read_res_highlight_file(self.subset_file)
+			
 		# Save data to pickle
 		with open(os.path.join(self.se_folder, f"{self.reference}_SE.pkl"), 'wb') as OUT:
 			pickle.dump(self.data, OUT)
@@ -311,35 +317,16 @@ class Plot:
 
 		return segments
 	
-	def _add_broken_axis_lines(self, axes):
-		"""
-		Adds diagonal lines to indicate breaks between subplots.
-		
-		Args:
-			axes (list): List of axis objects.
-		"""
-		d = 0.015  # Size of diagonal lines in axis coordinates
-		kwargs = dict(transform=axes[0].transAxes, color='k', clip_on=False)
-
-		for i, ax in enumerate(axes):
-			if i == 0:
-				ax.plot((1 - d, 1 + d), (-d, +d), **kwargs)
-				ax.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
-			elif i == len(axes) - 1:
-				ax.plot((-d, +d), (1 - d, 1 + d), **kwargs)
-				ax.plot((-d, +d), (-d, +d), **kwargs)
-			else:
-				kwargs.update(transform=ax.transAxes)
-				ax.plot((-d, +d), (1 - d, 1 + d), **kwargs)
-				ax.plot((-d, +d), (-d, +d), **kwargs)
-				ax.plot((1 - d, 1 + d), (-d, +d), **kwargs)
-				ax.plot((1 - d, 1 + d), (1 - d, 1 + d), **kwargs)
-
+	def add_subplot(self, fig, gs_pos):
+		ax = fig.add_subplot(gs_pos)
+		ax.set_aspect('auto')
+		return ax
+	
 
 	def plot(self):
 
 		####################################################################################################################
-		## Setting up graphics
+		## Setting up graphics for master figure
 		####################################################################################################################
 
 		master_fig = plt.figure(figsize=(30,20))
@@ -363,64 +350,52 @@ class Plot:
 
 			# plot shannon entropy
 			gs_pos = gs_master[0, col]
-			ax = self.se_graphing(segment, figsize=(12, 12), se_graph=master_fig, gs_pos=gs_pos)
+			ax = self.se_graphing(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# plot specificity
 			gs_pos = gs_master[1, col]
-			ax = self.specificity_graphing(segment, figsize=(12,12), scs_graph=master_fig, gs_pos=gs_pos)
-
-			# self.highlight_residues(scs_graph)
+			ax = self.specificity_graphing(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# plot residue presence matrix
 			gs_pos = gs_master[2:4, col]
-			ax = self.residue_presence_matrix(segment, figsize=(12,12), res_mat_graph=master_fig, gs_pos=gs_pos)
+			ax = self.residue_presence_matrix(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# number of residues
 			gs_pos = gs_master[5, col]
-			ax = self.number_of_residues(segment, figsize=(12,12), res_num_graph=master_fig, gs_pos=gs_pos)
+			ax = self.number_of_residues(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# residue distribution
 			gs_pos = gs_master[6, col]
-			# ax = self.residue_distribution(segment, figsize=(12,12), res_dist_graph=master_fig, gs_pos=gs_pos)
+			ax = self.residue_distribution(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# zscale distribution
 			gs_pos = gs_master[7, col]
-			ax = self.zscale_distribution(segment, figsize=(12,12), zscale_graph=master_fig, gs_pos=gs_pos)
+			ax = self.zscale_distribution(segment, graph=master_fig, gs_pos=gs_pos)
 
 			segment_index += 1
 
 		plt.tight_layout()
-
-
-	def add_subplot(self, fig, gs_pos):
-		ax = fig.add_subplot(gs_pos)
-		ax.set_aspect('auto')
-		return ax
 	
 	####################################################################################################################
 	## Individual plotting functions
 	####################################################################################################################
 
-	def se_graphing(self, segment, figsize=(15, 5), se_graph=None, gs_pos=(0, 0)):
+	def se_graphing(self, segment, graph=plt.figure(figsize=(20, 5)), gs_pos=111):
+		"""
+		Plot Shannon Entropy values for the reference sequence
+		"""
 
-		# TODO Remove figsize and se_graph from function arguments
+		ax = self.add_subplot(graph, gs_pos)
 
-		# Shannon Entropies for the reference
-		se_values = np.array([self.data[x]["SE"] for x in self.res_nums])
-
-		ax = self.add_subplot(se_graph, gs_pos)
-
-		if se_graph is None:
-			se_graph = plt.figure(figsize=figsize)
-			print("se_graphing, type se_graph",type(se_graph))
-
-		# Plot
+		## Plot entropy values
+		# blue line for average entropy
+		# black line for global entropy values
 		x_val = self.res_nums[segment]
 		indexes = [self.res_nums[segment].index(val) for val in x_val]
-		y_val = [self.data[x]["SE"] for x in x_val]
-		ax.plot(x_val, y_val, linewidth=0.5,color='k', zorder=10)
-		y_val = [self.average_SEs[index] for index in indexes]
-		ax.plot(x_val, y_val, linewidth=0.5,color='b')
+		se_values = [self.data[x]["SE"] for x in x_val]
+		ax.plot(x_val, se_values, linewidth=0.5,color='k', zorder=10)
+		avg_se_values = [self.average_SEs[index] for index in indexes]
+		ax.plot(x_val, avg_se_values, linewidth=0.5,color='b')
 
 		## Add "Highlighted Entropy Zones"
 		# Green (0.0-0.25)
@@ -435,18 +410,22 @@ class Plot:
 			ax.plot([x-0.5,x-0.5],[-0.05,1.05],color='w',linestyle='-',linewidth=0.75)
 
 		# Highlight residues with near equal representation in MSA
-		for i,val_x in enumerate(x_val):
-			num_res = self.data[val_x]["NUM_RES"]
-			num_res -= 1 if '-' in self.data[val_x]["RES_COUNTS"].keys() else 0
-			num_res -= 1 if 'X' in self.data[val_x]["RES_COUNTS"].keys() else 0
-			ax.plot(val_x,self.data[val_x]["SE"],marker="*",markersize=10*(1-self.data[val_x]["DEV"]),color='b')
-			self.num_ress[i] = num_res
-			if num_res < 10:
-				continue
+		# for i,val_x in enumerate(x_val):
+		# 	num_res = self.data[val_x]["NUM_RES"]
+		# 	num_res -= 1 if '-' in self.data[val_x]["RES_COUNTS"].keys() else 0
+		# 	num_res -= 1 if 'X' in self.data[val_x]["RES_COUNTS"].keys() else 0
+		# 	ax.plot(val_x,self.data[val_x]["SE"],marker="*",markersize=10*(1-self.data[val_x]["DEV"]),color='b')
+		# 	self.num_ress[i] = num_res
+		# 	if num_res < 10:
+		# 		continue
 
 		## Prettify the Y-axis
 		ax.yaxis.set_ticks([i*0.2 for i in range(int(1/0.2)+1)])
 		ax.yaxis.set_ticklabels([0.0,0.2,0.4,0.6,0.8,1.0])
+		if (gs_pos != 111):
+			if (gs_pos.colspan.start > 0):
+				ax.yaxis.set_ticks([])
+				ax.yaxis.set_ticklabels([])
 
 		ax.tick_params(axis='x',which='both',left=False,labelleft=False)
 		ax.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
@@ -455,53 +434,35 @@ class Plot:
 		ax.set_xlim([(x_val[0]-0.5),x_val[-1]+0.5])
 		ax.set_ylim([-0.05,1.05])
 
-	# 	# Residue and residue number labels
-	# 	labels = [f"{self.data[x]['RES']} [{x+1}]" if x%2 != 0 else f"{self.data[x]['RES']}" for x in self.res_nums]
+		# Residue and residue number labels
+		labels = [f"{self.data[x]['RES']} [{x+1}]" if x%2 != 0 else f"{self.data[x]['RES']}" for x in x_val]
 
-	# 	axt = se_graph.secondary_xaxis('top')
-	# 	axt.set_xticks(self.res_nums)
-	# 	axt.set_xticklabels(labels,font='monospace',fontsize=self.font_size,ha='center',va='bottom',rotation='vertical')
+		axt = ax.secondary_xaxis('top')
+		axt.set_xticks(x_val)
+		axt.set_xticklabels(labels,font='monospace',fontsize=self.font_size,ha='center',va='bottom',rotation='vertical')
 		
-		# # Add vertical lines at breaks
-		# for i in range(1, n_segments):  # Start from the second segment
-		# 	# Get the rightmost x-coordinate of the previous segment
-		# 	prev_segment = self.segments[i - 1]
-		# 	prev_max_x = max(self.res_nums[prev_segment])  # Use the slice to get the max x
-			
-		# 	# Draw vertical line on the left of the current segment
-		# 	axes[i].axvline(prev_max_x, color='black', linestyle='--', linewidth=2)
+		return graph, ax
 
-		# # Remove unnecessary ticks/labels
-		# for i, ax in enumerate(axes):
-		# 	if i > 0:
-		# 		ax.set_ylabel('')  # Remove the y-label
-		# 		ax.spines['left'].set_visible(False)
-		# 		ax.tick_params(left=False, labelleft=False)
+	def specificity_graphing(self, segment, graph=plt.figure(figsize=(20, 5)), gs_pos=111):
 
-		return ax
-
-	def specificity_graphing(self, segment, figsize, scs_graph, gs_pos):
-
-		# Shannon Entropies for the reference
-		se_values = np.array([self.data[x]["SE"] for x in self.res_nums])
-
-		ax = self.add_subplot(scs_graph, gs_pos)
+		ax = self.add_subplot(graph, gs_pos)
 
 		x_val = self.res_nums[segment]
 		indexes = [self.res_nums[segment].index(val) for val in x_val]
+		se_values = np.array([self.data[x]["SE"] for x in x_val])  # Shannon Entropies for the reference
+		avg_se_values = [self.average_SEs[index] for index in indexes]  # Average Shannon Entropies for the reference
 
 		rotate_deg = np.deg2rad(45)
 		sin_val = np.sin(rotate_deg)
 		cos_val = np.cos(rotate_deg)
 		off = 0.5
-		self.average_SEs = self.average_SEs
-		h = np.sqrt(np.square(self.average_SEs)+np.square(se_values))
+		h = np.sqrt(np.square(avg_se_values)+np.square(se_values))
 		cons = np.zeros(h.shape)
 		np.seterr(divide='ignore',invalid='ignore')
-		cons = -h*np.cos(np.arccos(self.average_SEs/h)-rotate_deg)
+		cons = -h*np.cos(np.arccos(avg_se_values/h)-rotate_deg)
 		np.nan_to_num(cons,copy=False)
 		cons += off
-		spec_dist = np.sqrt(np.square(self.average_SEs)+np.square(np.subtract(se_values,1)))
+		spec_dist = np.sqrt(np.square(avg_se_values)+np.square(np.subtract(se_values,1)))
 
 		for index,x in enumerate(x_val):
 			ax.plot(x, cons[index],markersize=5*(1-spec_dist[index]),marker='s',color='orange')
@@ -511,75 +472,87 @@ class Plot:
 			rect_start = x - (0.5*rect_width)
 			ax.add_patch(plt.Rectangle((rect_start,start_y),rect_width,length_y,facecolor='b',edgecolor='b'))
 
-		return ax
+		if self.highlights:  # filter highlights dict to only include residues in the current segment
+			highlights_segment = {key: [val for val in values if val in x_val] for key, values in self.highlights.items()}
+			highlights_segment = {key: values for key, values in highlights_segment.items() if values}
+			self.highlight_residues(ax, highlights=highlights_segment, xvals=x_val)
 
-	def highlight_residues(self, scs_graph):
+		## Prettify the Y-axis
+		if (gs_pos != 111):  # Hide Y-axis labels for subplots not on the left
+			if (gs_pos.colspan.start > 0):
+				ax.yaxis.set_ticks([])
+				ax.yaxis.set_ticklabels([])
+
+		return graph, ax
+
+	def highlight_residues(self, graph, highlights, xvals):
 
 		if self.highlights:
-			rand_colors = sample(range(len(self.color_keys)),len(self.highlights.keys()))
-			for index,source in enumerate(self.highlights.keys()):
-				for val_x in self.highlights[source]:
-					scs_graph.add_patch(plt.Rectangle((val_x-0.5,-0.6),1,1.2,facecolor=self.colors[f'xkcd:{self.color_keys[rand_colors[index]]}'],edgecolor="None",zorder=0,alpha=0.25))
+			rand_colors = sample(range(len(self.color_keys)),len(highlights.keys()))
+			for index,source in enumerate(highlights.keys()):
+				for val_x in highlights[source]:
+					graph.add_patch(plt.Rectangle((val_x-0.5,-0.6),1,1.2,facecolor=self.colors[f'xkcd:{self.color_keys[rand_colors[index]]}'],edgecolor="None",zorder=0,alpha=0.25))
 
 		# Set and rotate major tick labels
-		labels = [f"{val_x+1: >{len(str(self.len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in self.res_nums]
-		scs_graph.xaxis.set_ticks([i for i in self.res_nums])
-		scs_graph.tick_params(axis='x',which='both',bottom=False,labelbottom=False,top=False,labeltop=False)
-		scs_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=self.font_size,va='center',ha='center')
-		scs_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
-		scs_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
-		scs_graph.spines['bottom'].set_visible(False)
-		scs_graph.spines['top'].set_visible(False)
-		scs_graph.xaxis.set_minor_locator(MultipleLocator(1))
-		scs_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
-		scs_graph.set_xticks(self.res_nums)
-		scs_graph.set_xlim([(self.res_nums[0]-0.5),self.res_nums[-1]+0.5])
-		scs_graph.set_ylim([-0.65,0.65])
+		labels = [f"{val_x+1: >{len(str(self.len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in xvals]
+		graph.xaxis.set_ticks([i for i in xvals])
+		graph.tick_params(axis='x',which='both',bottom=False,labelbottom=False,top=False,labeltop=False)
+		graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=self.font_size,va='center',ha='center')
+		graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
+		graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
+		graph.spines['bottom'].set_visible(False)
+		graph.spines['top'].set_visible(False)
+		# graph.xaxis.set_minor_locator(MultipleLocator(1))
+		graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
+		graph.set_xticks(xvals)
+		graph.set_xlim([(xvals[0]-0.5),xvals[-1]+0.5])
+		graph.set_ylim([-0.65,0.65])
 
-	def residue_presence_matrix(self, segment, figsize, res_mat_graph, gs_pos):
 
-		ax = self.add_subplot(res_mat_graph, gs_pos)
+	def residue_presence_matrix(self, segment, graph=plt.figure(figsize=(20, 5)), gs_pos=111):
+		"""
+		Plot the presence of residues at each position in the MSA
+		"""
+
+		ax = self.add_subplot(graph, gs_pos)
 
 		x_val = self.res_nums[segment]
-		indexes = [self.res_nums[segment].index(val) for val in x_val]
-
-		aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
 
 		## Get a positive/negative matrix of what residues are present in the MSA at each residue
-		present_res = np.zeros((len(aas),len(x_val)))
-		for row_index,aa in enumerate(aas):
+		present_res = np.zeros((len(self.aas),len(x_val)))
+		for row_index,aa in enumerate(self.aas):
 			for col_index,val_x in enumerate(x_val):
 				if aa in self.data[val_x]["RES_COUNTS"].keys():
 					present_res[row_index][col_index] = 1 if self.data[val_x]["RES_COUNTS"][aa] > 0 else 0
-
-		# print(f"Present Residue Matrix: {present_res}")
-		print(present_res.shape)
-		print(present_res)
-
 
 		ax.cla()
 		img = ax.imshow(present_res,aspect='auto',cmap='tab20_r')
 		img.set_data(present_res)
 
 		## Setup Y-Axis
-		ax.set_yticks([i for i in range(len(aas))],labels=aas,font='monospace')
+		ax.set_yticks([i for i in range(len(self.aas))],labels=self.aas,font='monospace')
 		# res_mat_graph.yaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-		ax.yaxis.set_minor_locator(MultipleLocator(1))
+		# ax.yaxis.set_minor_locator(MultipleLocator(1))
 		ax.yaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
 		ax.tick_params(axis='y',which='minor',left=False)
 
+		if (gs_pos != 111):   # Hide Y-axis labels for subplots not on the left
+			if (gs_pos.colspan.start > 0):
+				ax.yaxis.set_ticks([])
+				ax.yaxis.set_ticklabels([])
+
 		## Setup X-Axis
 		# Set major tick for each residue [0 to pos-1]
-		# ax.xaxis.set_ticks([i-1 for i in range(len(x_val)+1)])
+		ax.xaxis.set_ticks([i-1 for i in range(len(x_val)+1)])
 		# Set and rotate major tick labels
-		# labels = [f"{val_x: >{len(str(self.len_of_seq))+1}}" if val_x%2 == 0 else "" for val_x in range(len(x_val)+1)]
-		# ax.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=self.font_size,va='center',ha='center')
+		labels = [f"{val_x: >{len(str(self.len_of_seq))+1}}" if val_x%2 == 0 else "" for val_x in range(len(x_val)+1)]
+		ax.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=self.font_size,va='center',ha='center')
 		# Show major tick labels, but not the ticks themselves, and only on the top
 		ax.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=True,labelbottom=False)
 
 		# Set minor ticks for each residue, but offset by -0.5 to create fake gridlines
-		# res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-		ax.xaxis.set_minor_locator(MultipleLocator(1))
+		# graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+		# ax.xaxis.set_minor_locator(MultipleLocator(1))
 		# Don't show any information regarding the minor ticks
 		ax.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
 		
@@ -589,19 +562,28 @@ class Plot:
 
 		# Turn on X-axis gridlines using the minor ticks
 		ax.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
-		# ax.set_xlim([(x_val[0]-0.5),x_val[-1]+0.5])
+		ax.set_xlim([-0.5,x_val[-1]-x_val[0]+0.5])
 		
-		return ax
+		return graph, ax
 
-	def number_of_residues(self, segment, figsize, res_num_graph, gs_pos):
+	def number_of_residues(self, segment, graph=plt.figure(figsize=(20, 5)), gs_pos=111):
 		"""
 		Plot the number of different residues present at each position
 		"""
 
-		ax = self.add_subplot(res_num_graph, gs_pos)
+		ax = self.add_subplot(graph, gs_pos)
 
 		x_val = self.res_nums[segment]
 		indexes = [self.res_nums[segment].index(val) for val in x_val]
+
+		# TODO Move somewhere general
+		for i,val_x in enumerate(x_val):
+			num_res = self.data[val_x]["NUM_RES"]
+			num_res -= 1 if '-' in self.data[val_x]["RES_COUNTS"].keys() else 0
+			num_res -= 1 if 'X' in self.data[val_x]["RES_COUNTS"].keys() else 0
+			self.num_ress[i] = num_res
+			if num_res < 10:
+				continue
 
 		n_res = [self.num_ress[index] for index in indexes]
 	
@@ -610,21 +592,26 @@ class Plot:
 		## Setup X-Axis
 		# Set major tick for each residue [0 to pos-1]
 		ax.xaxis.set_ticks([i for i in x_val])
+		# ax.set_xlim([(x_val[0]-0.5),x_val[-1]+0.5])
+		# print(str(x_val[-1]-x_val[0]+0.5))
+		# ax.set_xlim([0.5, x_val[-1]-x_val[0]+0.5])
 		# Set and rotate major tick labels
-		labels = [f"{val_x+1: >{len(str(self.len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in x_val]
+		labels = [f"{val_x+1: >{len(str(len(x_val)))+1}}" if val_x%2 != 0 else "" for val_x in x_val]
 		ax.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=self.font_size,va='center',ha='center')
 		ax.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
-
+		
 		# res_num_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-		ax.xaxis.set_minor_locator(MultipleLocator(1))
+		# ax.xaxis.set_minor_locator(MultipleLocator(1))
 		ax.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
 		ax.tick_params(axis='x',which='minor',top=False,bottom=False)
-
-		ax.set_xlim([(x_val[0]-0.5),x_val[-1]+0.5])
 
 		## Setup Y-Axis
 		ax.set_ylim([-0.05,21])
 		ax.set_yticks([0,5,10,15,20])
+		if (gs_pos != 111):   # Hide Y-axis labels for subplots not on the left
+			if (gs_pos.colspan.start > 0):
+				ax.yaxis.set_ticks([])
+				ax.yaxis.set_ticklabels([])
 		
 		# Show horizontal guidelines
 		ax.plot([x_val[0]-0.5,x_val[-1]+0.5],[5,5],color='w',linestyle='--',linewidth=1)
@@ -636,27 +623,25 @@ class Plot:
 		ax.spines['top'].set_visible(False)
 		ax.spines['bottom'].set_visible(False)
 
-		return ax
+		return graph, ax
 
-	def residue_distribution(self, segment, figsize, res_dist_graph, gs_pos):
+	def residue_distribution(self, segment, graph=plt.figure(figsize=(20, 5)), gs_pos=111):
 
-		# TODO ADD COLORSCHEME HERE
+		# TODO Add color-scheme here for pos, neg, hydrophobic, etc.
+		
+		ax = self.add_subplot(graph, gs_pos)
+		x_val = self.res_nums[segment]
+
+	    # Initialize `bottoms` as a zero array for stacking bars
+		bottoms = np.zeros(len(x_val))
+
+		labels = [f"{val_x+1: >{len(str(len(x_val)))+1}}" if val_x%2 != 0 else "" for val_x in x_val]
 
 		# Stacking bars require a y-value to place the bottom of the bar
-
-		aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
-
-		ax = self.add_subplot(res_dist_graph, gs_pos)
-
-		x_val = self.res_nums[segment]
-		indexes = [self.res_nums[segment].index(val) for val in x_val]
+		bottoms = np.zeros(len(x_val))
 	
-		bottoms = np.zeros(self.len_of_seq)
-	
-		labels = [f"{val_x+1: >{len(str(self.len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in x_val]
-
-		for i in range(len(aas)):
-			res_vals = np.zeros(self.len_of_seq)
+		for i in range(len(self.aas)):
+			res_vals = np.zeros(len(x_val))
 			for index,val_x in enumerate(x_val):
 				if i < len(self.data[val_x]["RES_COUNTS"].keys()):
 					sorted_res_counts = sorted(self.data[val_x]["RES_COUNTS"].keys(),reverse=True,key=lambda x: self.data[val_x]["RES_COUNTS"][x])
@@ -664,8 +649,8 @@ class Plot:
 				else:
 					res_vals[index] = 0
 
-		# 	ax.bar(x_val,res_vals[],1,bottom=bottoms)
-		# bottoms += res_vals
+			ax.bar(x_val,res_vals,1,bottom=bottoms)
+			bottoms += res_vals
 
 		## Setup top X-Axis
 		ax.set_xlim([(x_val[0]-0.5),x_val[-1]+0.5])
@@ -675,42 +660,40 @@ class Plot:
 		ax.set_xticklabels(labels=labels,rotation='vertical',fontsize=self.font_size,va='center',ha='center')
 		ax.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
 		ax.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
-		# res_dist_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-		ax.xaxis.set_minor_locator(MultipleLocator(1))
+		# # res_dist_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+		# # ax.xaxis.set_minor_locator(MultipleLocator(1))
 		ax.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
-		## Setup bottom X-Axis
+		# ## Setup bottom X-Axis
 		rdg_bt = ax.secondary_xaxis("bottom")
 		rdg_bt.set_xticks([i for i in x_val])
 		rdg_bt.tick_params(which='both',bottom=False)
-		# labels = [f"[{x+1}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
 		labels = [f"[{x+1}] {self.data[x]['CON_RES']}" if x%2 != 0 else self.data[x]['CON_RES'] for x in x_val]
 		rdg_bt.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=self.font_size)
 
-		## Setup Y-Axis
+		# ## Setup Y-Axis
 		ax.yaxis.set_ticks([i*0.2 for i in range(int(1/0.2)+1)])
 		ax.yaxis.set_ticklabels([0.0,0.2,0.4,0.6,0.8,1.0])
+		if (gs_pos != 111):   # Hide Y-axis labels for subplots not on the left
+			if (gs_pos.colspan.start > 0):
+				ax.yaxis.set_ticks([])
+				ax.yaxis.set_ticklabels([])
 
 		ax.spines['top'].set_visible(False)
 
-		return ax
+		return graph, ax
 
-	def zscale_distribution(self, segment, figsize, zscale_graph, gs_pos):
+	def zscale_distribution(self, segment, graph=plt.figure(figsize=(20, 5)), gs_pos=111):
 
-		scales = ['Z1','Z2','Z3']
-
-		ax = self.add_subplot(zscale_graph, gs_pos)
+		ax = self.add_subplot(graph, gs_pos)
 
 		x_val = self.res_nums[segment]
-		indexes = [self.res_nums[segment].index(val) for val in x_val]
 
 		# Store Z-sclales in matrix
-		m = np.zeros((len(scales), len(x_val) +1))  # For clarity, show only first 3 Z-scales
+		m = np.zeros((len(self.scales), len(x_val) +1))  # For clarity, show only first 3 Z-scales
 
-		for i,scale in enumerate(scales):
+		for i,scale in enumerate(self.scales):
 			for index,val_x in enumerate(x_val):
 				m[i][index] = self.data[val_x]["ZSCALES"][scale]
-
-		print(f"Segment: {segment}, Data Shape: {m.shape}")
 
 		# clear the axis
 		ax.cla()
@@ -718,35 +701,24 @@ class Plot:
 		img.set_data(m)
 
 		## Setup Y-Axis
-		ax.set_yticks([i for i in range(len(scales))],labels=scales[::-1],font='monospace')
+		ax.set_yticks([i for i in range(len(self.scales))],labels=self.scales[::-1],font='monospace')
 
-		# ## Setup X-Axis
-		ax.set_xticks(range(len(x_val)))
-		ax.set_xticklabels(x_val, rotation=45, ha='right', font='monospace')
+		## Setup X-Axis
+		labels = [f"{val_x+1: >{len(str(len(x_val)))+1}}" if val_x%2 != 0 else "" for val_x in x_val]
+		ax.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=self.font_size,va='center',ha='center')
+		# ax.xaxis.set_ticks([i for i in x_val])
+		# Turn on X-axis gridlines using the minor ticks
+		ax.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
 
-		# Set and rotate major tick labels
-		# labels = [f"{val_x: >{len(str(self.len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in x_val]
-		# ax.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=self.font_size,va='center',ha='center')
-		# Show major tick labels, but not the ticks themselves, and only on the top
-		# ax.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=False,labelbottom=True)
-
-		# # Set minor ticks for each residue, but offset by -0.5 to create fake gridlines
-		# res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-		# ax.xaxis.set_minor_locator(MultipleLocator(1))
-		# Don't show any information regarding the minor ticks
-		# ax.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=True)
-		
-		# # Hide the top and bottom axes
+		# Hide the top and bottom axes
 		ax.spines['top'].set_visible(False)
 		ax.spines['bottom'].set_visible(False)
 
-		# # Turn on X-axis gridlines using the minor ticks
-		ax.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
-
-		return ax
+		return graph, ax
 
 
 	def global_vs_subfam(self, figsize=(5, 5)):
+		# TODO Add highlight option here
 		f, ax = plt.subplots(figsize=figsize)
 		if self.mode == "TEA":
 			ax.scatter(self.summed_SEs, np.array([self.data[i]['SE'] for i in self.data]))
@@ -763,6 +735,8 @@ class Plot:
 			fig = px.scatter(x=self.average_SEs, 
 							 y=np.array([self.data[i]['SE'] for i in self.data]),
 							hover_name=np.array([self.data[i]['RES'] for i in self.data]),
+							hover_data={"MSA_POS": np.array([self.data[i]['MSA_POS'] for i in self.data]),
+										"CON_RES": np.array([self.data[i]['CON_RES'] for i in self.data])},
 							width=width,
 							height=height)
 			fig.update_layout(title='Average vs Global subfamily entropy', xaxis_title='Average subfamily entropy', yaxis_title='Global entropy')
@@ -775,12 +749,12 @@ class Plot:
 			fig.update_layout(title='Summed vs Global subfamily entropy', xaxis_title='Summed subfamily entropy', yaxis_title='Global entropy')
 		return fig
 	
-	# def plot_with_broken_axis(self, scs_graph=None, figsize=(15, 5), **kwargs):
+	# def plot_with_broken_axis(self, graph=None, figsize=(15, 5), **kwargs):
 	# 	"""
 	# 	Creates a plot with broken axes if the data contains large gaps and adds vertical lines at breaks.
 
 	# 	Args:
-	# 		scs_graph (matplotlib.axes.Axes): Existing subplot, if any.
+	# 		graph (matplotlib.axes.Axes): Existing subplot, if any.
 	# 		figsize (tuple): Figure size, e.g., (15, 5).
 	# 		**kwargs: Additional plotting options.
 	# 	"""
