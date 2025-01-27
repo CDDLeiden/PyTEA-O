@@ -24,6 +24,8 @@ from math import log
 import sys
 import matplotlib.gridspec as gridspec
 
+from sys import exit
+
 
 # TODO Remove Y-labels for subplots not on the left
 # TODO Option to sort/rank residues
@@ -82,7 +84,7 @@ class Analyse:
 
 		if not exists(SE_file):
 			print(f"\n\n\t[E]  {SE_file} does not exist!\n")
-			exit
+			exit()
 
 		with open(SE_file,'r') as IN:
 			for line in IN:
@@ -721,6 +723,7 @@ class Plot:
 		# TODO Add highlight option here
 		f, ax = plt.subplots(figsize=figsize)
 		if self.mode == "TEA":
+			# print("TEA mode", len(self.summed_SEs), len([self.data[i]['SE'] for i in self.data]))
 			ax.scatter(self.summed_SEs, np.array([self.data[i]['SE'] for i in self.data]))
 			ax.set_xlabel('Summed subfamily entropy')
 		elif self.mode == "TEAO":
