@@ -449,19 +449,17 @@ def run(args:dict) -> None:
 						# m = len(families.keys())
 						
 						results = []
-						m = len(families.keys())
 						with mp.Pool(threads) as executor:
 							results = executor.map(calc_summed_entropy,[msas.loc[family] for family in families.values()])
 						results = np.array(results)
 						# print(results.shape)
-						# tmp = np.sum(results,axis=0)
-						tmp = np.divide(np.sum(results,axis=0),m)
-						E_i = (tmp - np.min(tmp)) / (np.max(tmp) - np.min(tmp))
+						E_i = np.sum(results,axis=0)
+						# print(E_i)
+						# print(E_i.shape)
 
 		with open(f"{outpath}/summed_subfamily_shannon_entropy.txt",'w') as OUT:
 			for msa_pos,se in enumerate(E_i):
 				OUT.write(f"{msa_pos}\t{se:.2f}\n")
-				print("written output")
 
 	# load_similarity_matrix(matrix=sim_mat)
 
