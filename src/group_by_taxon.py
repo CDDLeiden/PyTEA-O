@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 from os.path import isfile, abspath
 import os
 from subprocess import run
@@ -11,7 +10,18 @@ from typing import Generator
 import mmap
 
 
-def setup_db() -> dict:
+def setup_db(db_dir:str=None) -> dict:
+
+	"""
+	Setup the necessary databases for protein accession number to taxonoic IDs,
+	downloading files as necessary.
+
+	Args
+		db_dir	Directory containing necessary datases
+
+	Return
+		database_files	Dictionary object linking to database file locations
+	"""
 
 	pipeline_path = "/".join(abspath(__file__).split("/")[0:-2])
 	db_dir = f"{pipeline_path}/DB_files"
@@ -81,6 +91,16 @@ def setup_db() -> dict:
 
 def load_nodes(nodes_file:str=None) -> dict:
 
+	"""
+	Parses taxonomic database file, linking child IDs to parent IDs
+
+	Args
+		nodes_file	Path to NCBI nodes.dmp database file
+
+	Returns
+		node_links	Dictionary object linking child taxonomic ID to parent taxonmic ID
+	"""
+
 	node_links = {}
 
 	with open(nodes_file,'r') as IN:
@@ -98,6 +118,17 @@ def load_nodes(nodes_file:str=None) -> dict:
 	return node_links
 
 def get_sequence_accessions(msa_file:str=None) -> set:
+
+	"""
+	Extracts accession numbers from Multiple Sequence Alignment (MSA) files
+	in FASTA format.
+
+	Args
+		msa_file	Multiple Sequence Alignment (MSA) file in FASTA format
+
+	Returns
+		accessions_set	Set of all accession numbers in MSA file
+	"""
 
 	accessions_set = set()
 
@@ -170,13 +201,13 @@ def read_file_chunks(file_handle:mmap.mmap=None,chunk_size:int=(5*(1024**2))) ->
 
 	"""
 
-	Args:
-		file_handle:	Memory map (mmap.mmap) file object
+	Args
+		file_handle	Memory map (mmap.mmap) file object
 		chunk_size	Size of chunks to create in byets [Default: 5*(1024**2) bytes]
 
-	Return:
-		file_point_start:	Address of current position in memory map object
-		file_chunk_length:	Length of memory map object chunk
+	Returns
+		file_point_start	Address of current position in memory map object
+		file_chunk_length	Length of memory map object chunk
 
 	"""
 
@@ -209,7 +240,12 @@ async def convert(file_chunk=None,accession_set:set=None,a2tax_links:dict=None):
 
 	return a2tax_links
 
-async def convert_accession_to_taxid(input_queue:Queue=None,a2tax_links:dict=None,accession_set:set=None) -> None:
+async def convert_accession_to_taxid(
+			input_queue:Queue=None,
+			a2tax_links:dict=None,
+			accession_set:set=None,
+			outdir:str="TaxonomyGrouping",
+	) -> None:
 
 	while True:
 		
@@ -219,13 +255,17 @@ async def convert_accession_to_taxid(input_queue:Queue=None,a2tax_links:dict=Non
 
 		if file_chunk is not None:
 
-			await convert(file_chunk=file_chunk,accession_set=accession_set,a2tax_links=a2tax_links)
+			await convert(
+					file_chunk=file_chunk,
+					accession_set=accession_set,
+					a2tax_links=a2tax_links
+			)
 
 		else:
 			
 			break
 
-	with open("test.txt",'w') as OUT:
+	with open(f"{outdir}/accession_taxids.tsv",'w') as OUT:
 
 		for key,value in a2tax_links.items():
 			
@@ -233,20 +273,24 @@ async def convert_accession_to_taxid(input_queue:Queue=None,a2tax_links:dict=Non
 
 	return None
 
-async def link_accessions_to_taxids(a2tax_file:str=None,a2tax_links:dict=None,accession_set:set=None,max_chunks:int=10,chunk_size:int=(5*(1024**2))):
+async def link_accessions_to_taxids(
+			a2tax_file:str=None,
+			accession_set:set=None,
+			max_chunks:int=10,
+			chunk_size:int=(5*(1024**2))
+	) -> dict:
 
 	"""
 	Generates links between protein accessions and taxonomy IDs using NCBIs prot.accession2taxid.FULL.gz file.
 
-	Args:
-		a2tax_file: Path to NCBI's prot.accession2taxid.FULL.gz file
-
-		accession_set: Unique set of protein accessions acquired from MSA file
-
-		max_chunk: Number of file chunks to load in at a single time
-
-		chunk_size: Size of file chunks
+	|Args
+	|	a2tax_file: Path to NCBI's prot.accession2taxid.FULL.gz file
+	|	accession_set: Unique set of protein accessions acquired from MSA file
+	|	max_chunk: Number of file chunks to load in at a single time
+	|	chunk_size: Size of file chunks
 	"""
+
+	a2tax_links = {}
 
 	## Create chunk queue
 	chunk_queue = Queue(maxsize=max_chunks)
@@ -271,33 +315,17 @@ async def link_accessions_to_taxids(a2tax_file:str=None,a2tax_links:dict=None,ac
 
 	await gather(read_a2tax,conversion_task)
 
-	return
+	return a2tax_links
 
-def main(args:dict=None) -> int:
+def group_accessions(
+		a2tax_links:dict=None,
+		nodes_links:dict=None,
+		outdir:str="TaxonomyGrouping",
+	) -> None:
 
-	from time import time
-
-	database_files = setup_db()
-	nodes_links = load_nodes(nodes_file=database_files['nodes'])
-	accession_set = get_sequence_accessions(msa_file=args.msa)
-
-	start = time()
-
-	a2tax_links = {}
-
-	# run(
-	# 	link_accessions_to_taxids(
-	# 		a2tax_file=database_files['a2tax'],
-	# 		accession_set=accession_set,
-	# 		max_chunks=args.num_chunks,
-	# 		chunk_size=args.chunk_size*(1024**2)
-	# 	)
-	# )
-
-	with open("test.txt",'r') as IN:
-		for line in IN:
-			accession,taxid = line.strip().split("\t")
-			a2tax_links[accession] = int(taxid)
+	"""
+	
+	"""
 
 	taxonomy = {}
 
@@ -325,8 +353,6 @@ def main(args:dict=None) -> int:
 
 			if taxid == 1:
 				break
-
-	# print(f"Completed in {time()-start:.0f}s")
 
 	desired_outputs = [
 		"superkingdom",
@@ -358,7 +384,7 @@ def main(args:dict=None) -> int:
 
 				counts[rank] += 1
 
-	with open("groupings.csv",'w') as OUT:
+	with open(f"{outdir}/groupings.csv",'w') as OUT:
 		
 		headers = ";".join(sorted(groupings.keys()))
 
@@ -370,7 +396,44 @@ def main(args:dict=None) -> int:
 
 			OUT.write(f"{line}\n")
 
-	return 0
+	return None
+
+def main(args:dict=None) -> int:
+
+	from time import time
+
+	start = time()
+
+	## Setup database files
+	database_files = setup_db()
+
+	## Link child taxids to parent taxids
+	nodes_links = load_nodes(
+		nodes_file=database_files['nodes']
+	)
+	
+	## Extract MSA accession numbers
+	accession_set = get_sequence_accessions(
+		msa_file=args.msa
+	)
+
+	## Link MSA accession numbers to taxids
+	a2tax_links = run(
+		link_accessions_to_taxids(
+			a2tax_file=database_files['a2tax'],
+			accession_set=accession_set,
+			max_chunks=args.num_chunks,
+			chunk_size=args.chunk_size*(1024**2)
+		)
+	)
+
+	## Group accession numbers by taxids
+	group_accessions(
+		a2tax_links=a2tax_links,
+		nodes_links=nodes_links
+	)
+
+	return None
 
 if __name__ == "__main__":
 
@@ -378,11 +441,38 @@ if __name__ == "__main__":
 
 	GetOptions = ArgumentParser()
 
-	GetOptions.add_argument("-m","--msa",required=True)
-	GetOptions.add_argument("-s","--chunk_size",required=False,type=int,default=5)
-	GetOptions.add_argument("-n","--num_chunks",required=False,type=int,default=10)
-	GetOptions.add_argument("-t","--threads",required=False,type=int,default=2)
+	GetOptions.add_argument(
+					"-m","--msa",
+					required=True,
+					help="Path to MSA-file containing accessions to group by taxonomy."
+	)
 
-	args = GetOptions.parse_known_args()[0]
+	GetOptions.add_argument(
+					"-s","--chunk_size",
+					required=False,
+					type=int,
+					default=5,
+					help="Size of file chunks in megabases (Mb) [Default: 5Mb]"
+	)
+	
+	GetOptions.add_argument(
+					"-n","--num_chunks",
+					required=False,
+					type=int,
+					default=10
+	)
 
-	main(args=args)
+	GetOptions.add_argument(
+					"-t","--threads",
+					required=False,
+					type=int,
+					default=2
+	)
+
+	GetOptions.add_argument(
+					"-o","--outdir",
+					type=str,
+					default="TaxonomyGrouping"
+	)
+
+	main(args=GetOptions.parse_known_args()[0])
