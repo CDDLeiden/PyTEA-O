@@ -8,6 +8,7 @@ from asyncio.queues import Queue
 from asyncio import create_task, gather, run
 from typing import Generator
 import mmap
+import sys
 
 
 def setup_db(db_dir:str=None) -> dict:
@@ -345,6 +346,8 @@ def group_accessions(
 			chunk_size=args.chunk_size*(1024**2)
 		)
 	)
+
+	sys.exit()
 
 	# with open("test.txt",'r') as IN:
 	# 	for line in IN:

@@ -45,12 +45,16 @@ def check_input(msa, subgroups):
     Find any un-assigned IDs or IDs that are assigned to multiple subgroups
     """
     msa = AlignIO.read(msa, "fasta")
+    print("Length of MSA: ", len(msa))
+    print("Number of subgroups: ", len(subgroups))
     assigned = []
     for i in msa:
         for key, value in subgroups.items():
             if i.id in value:
                 assigned.append(i.id)
     unassigned = [i for i in msa if i.id not in assigned]
+    print("Number of unassigned IDs: ", len(unassigned))
+    print("Number of assigned IDs: ", len(assigned))
     if len(unassigned) > 0:
         print("Error: The following IDs are not assigned to any subgroup")
         for i in unassigned:

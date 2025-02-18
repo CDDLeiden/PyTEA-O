@@ -191,24 +191,15 @@ def shannon_entropy(msa:pd.DataFrame) -> dict:
 def calc_average_entropy(msas:pd.DataFrame) -> list:
 
 	N_j,n_res = msas.shape
-	# print(f"N_j value: {N_j}")
 
 	if N_j == 1:
 		test = np.zeros(n_res)
 		return test
 
-	import sys
-	# print(N_j)
 	res_counts = process_colummns(msa=msas)
-	# print("res_counts:", res_counts)
 	AAs = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
-	# A_j = np.array([[res_counts[res_num][res] if res in res_counts[res_num].keys() else 0 for res_num in sorted(res_counts.keys())] for res in AAs])
 	A_j = np.array([[res_counts[res_num][res] if res in res_counts[res_num].keys() else 0 for res in AAs] for res_num in sorted(res_counts.keys())])
-	# print(f"A_j shape: {A_j.shape}")
-	# print(f"A_j values: {A_j[0]}")
 	G_j = np.array([res_counts[res_num]['-'] if '-' in res_counts[res_num].keys() else 0 for res_num in sorted(res_counts.keys())])
-	# print(f"G_j shape: {G_j.shape}")
-	# print(f"G_j values: {G_j[0]}")
 	W_j = 1/log(N_j) if N_j < 20 else 1/log(20)
 
 	n_j = 1/N_j
@@ -226,7 +217,6 @@ def calc_average_entropy(msas:pd.DataFrame) -> list:
 	# print(f"G_j*n_j*ln(n_j): {(-G_j*n_j*np.log(n_j))[0]}")
 	# print(W_j*((-np.sum(((a_j)*np.log(a_j)),axis=1))-(G_j*n_j*np.log(n_j)))[0])
 
-	# print(f"average entropies {len(W_j*((-np.sum(((a_j)*np.log(a_j)),axis=1))-(G_j*n_j*np.log(n_j))))} {W_j*((-np.sum(((a_j)*np.log(a_j)),axis=1))-(G_j*n_j*np.log(n_j)))}")
 	return W_j*((-np.sum(((a_j)*np.log(a_j)),axis=1))-(G_j*n_j*np.log(n_j)))
 
 def calc_summed_entropy(msas:pd.DataFrame) -> list:
@@ -234,12 +224,10 @@ def calc_summed_entropy(msas:pd.DataFrame) -> list:
 	N_j,n_res = msas.shape
 
 	res_counts = process_colummns(msa=msas)
-	# print(f"Res counts: {res_counts}")
 	AAs = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
 	F_ia = {}
 	E_i = []
 	for position, counts in res_counts.items():
-		# print(position, counts)
 		F_ia[position] = []
 		entropy = 0
 		for aa, count in counts.items():
@@ -248,10 +236,8 @@ def calc_summed_entropy(msas:pd.DataFrame) -> list:
 					F_ia[position].append(1/N_j)
 			elif aa in AAs:
 				F_ia[position].append(count/N_j)
-		# print(F_ia[position])
 		entropy += -1 * np.sum(F_ia[position]*np.log(F_ia[position]))
 		E_i.append(entropy)
-	# print(f"E_i values: {E_i}")
 	return E_i
 
 
@@ -265,7 +251,7 @@ def run(args:dict) -> None:
 	reference_ids = args.reference_ids
 	threads = args.threads
 	mode= args.program_mode
-	sim_mat = args.similarity_matrix
+	# sim_mat = args.similarity_matrix
 
 	# Default settings
 	shannon_entropy_file = "shannon_entropy.txt"
@@ -326,11 +312,9 @@ def run(args:dict) -> None:
 		total_branch_points = 0
 		with open(path_subfamilies,'r') as IN:
 			total_branch_points = sum(1 for line in IN if line[0] != '#')
-			# print(f"Total Branch Points: {total_branch_points}")
 
 		previous_branch_points = 0
 		SEs = np.zeros((total_branch_points,n_res))
-		# print(f"SEs shape: {SEs.shape}")
 		temp_file = f"{outpath}/.subfamily_entropies"
 		if exists(temp_file):
 			with open(temp_file,'r') as TEMP:
@@ -360,13 +344,9 @@ def run(args:dict) -> None:
 					continue
 
 				branch_point += 1
-				# print(f"\nProcessing branch point {branch_point}...")
-				# print(len(indexes), "Indexes: ", indexes)
-				
+	
 				families = {}
 				for index,family in enumerate(line.split(";")):
-					# print("Length:", len(line.split(";")))
-					# print("index = ", index, "family = ", family)
 					if family not in families.keys():
 						families[family] = []
 
@@ -383,12 +363,8 @@ def run(args:dict) -> None:
 				results = []
 				with mp.Pool(threads) as executor:
 					results = executor.map(calc_average_entropy,[msas.loc[family] for family in families.values()])
-					# print(f"tmp Results: {len(results)} {results}")
 				results = np.array(results)
-				# print(f"Results shape: {results.shape}")
-				# print(results)
 				E_i = np.divide(np.sum(results,axis=0),m)
-				# print(f"E_i shape: {E_i.shape}")
 
 				buffer = len(str(total_branch_points))
 
@@ -415,9 +391,8 @@ def run(args:dict) -> None:
 					branch_start = time()
 
 		SEs = np.divide(np.sum(SEs,axis=0),total_branch_points)
-		# print("SEs", SEs)
 
-		with open(f"{outpath}/average_shannon_entropy.txt",'w') as OUT:
+		with open(f"{outpath}/teao_average_shannon_entropy.txt",'w') as OUT:
 			for msa_pos,se in enumerate(SEs):
 				OUT.write(f"{msa_pos: <{msa_buffer}}\t{se:.2f}\n")
 
@@ -445,19 +420,16 @@ def run(args:dict) -> None:
 
 							families[family].append(indexes[index])
 						
-						# ## Iterate over each subfamily
-						# m = len(families.keys())
+						## Iterate over each subfamily
+						m = len(families.keys())
 						
 						results = []
 						with mp.Pool(threads) as executor:
 							results = executor.map(calc_summed_entropy,[msas.loc[family] for family in families.values()])
 						results = np.array(results)
-						# print(results.shape)
-						E_i = np.sum(results,axis=0)
-						# print(E_i)
-						# print(E_i.shape)
+						E_i = np.divide(np.sum(results,axis=0),m)
 
-		with open(f"{outpath}/summed_subfamily_shannon_entropy.txt",'w') as OUT:
+		with open(f"{outpath}/tea_average_shannon_entropy.txt",'w') as OUT:
 			for msa_pos,se in enumerate(E_i):
 				OUT.write(f"{msa_pos}\t{se:.2f}\n")
 

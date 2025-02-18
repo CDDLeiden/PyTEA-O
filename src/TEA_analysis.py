@@ -1,57 +1,58 @@
 #!/usr/bin/env python3
 
 import os
+from os.path import exists
+
 import sys
+from sys import exit
+
+from math import log
+
 import pickle
 import numpy as np
 import pandas as pd
+from random import sample
+from statistics import median, mean
+
+
 import plotly.express as px
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import matplotlib.patches as patches
+import matplotlib.gridspec as gridspec
+from matplotlib.ticker import MultipleLocator
+
 from sklearn import preprocessing
 from utils import extract_from_tsf, read_alignment, load_pickle
 
-from matplotlib import pyplot as plt
-from random import sample
-import matplotlib.colors as mcolors
-from matplotlib.ticker import MultipleLocator
-import matplotlib.patches as patches
-from os.path import exists
-from os import makedirs
-from statistics import median, mean
-import numpy as np
-import pandas as pd
-from math import log
-import sys
-import matplotlib.gridspec as gridspec
-
-from sys import exit
-
-
-# TODO Remove Y-labels for subplots not on the left
-# TODO Option to sort/rank residues
+# TODO Add option to sort/rank residues
 
 class Analyse:
 	"""
 	Parse SE results and prepare for plotting
 	"""
 
-	def __init__(self):
-		# TODO make some arguments necessary
-		self.mode = None
-		self.se_folder = None
-		self.reference = None
+	def __init__(self,
+			  mode:str,
+			  se_folder:str,
+			  reference:str):
+		
+		self.mode = mode
+		self.se_folder = se_folder
+		self.reference = reference
+
 		self.highlights_file = None
 		self.subset_file = None
 
 		self.SE_file = 'shannon_entropy.txt'
-		self.average_SE_file = 'average_shannon_entropy.txt'
-		self.summed_entropy_file = 'summed_subfamily_shannon_entropy.txt'
+		self.teao_average_SE_file = 'teao_average_shannon_entropy.txt'
+		self.tea_average_SE_file = 'tea_average_shannon_entropy.txt'
 		self.consensus_file = 'consensus_logo.txt'
 		self.zscale_file = 'zscales.txt'
 
 		self.data = {}
-		self.average_SEs: np.array = None
-		self.summed_SEs: np.array = None
+		self.teao_average_SEs: np.array = None
+		self.tea_average_SEs: np.array = None
 		self.highlights = None
 		self.subset = None
 		self.msa_links = {}
@@ -62,10 +63,10 @@ class Analyse:
 		self.read_zscale_file()
 	
 		if self.mode == "TEA":
-			self.summed_SEs = self.read_summed_entropy_file()
+			self.tea_average_SEs = self.read_average_entropy_file(self.tea_average_SE_file)
 
 		elif self.mode == "TEAO":
-			self.average_SEs = self.read_average_entropy_file()
+			self.teao_average_SEs = self.read_average_entropy_file(self.teao_average_SE_file)
 
 		if self.highlights_file:
 			self.highlights = self.read_res_highlight_file(self.highlights_file)
@@ -73,7 +74,6 @@ class Analyse:
 		if self.subset_file:
 			self.subset = self.read_res_highlight_file(self.subset_file)
 			
-		# Save data to pickle
 		with open(os.path.join(self.se_folder, f"{self.reference}_SE.pkl"), 'wb') as OUT:
 			pickle.dump(self.data, OUT)
 
@@ -104,9 +104,9 @@ class Analyse:
 		return self.data,self.msa_links
 
 
-	def read_average_entropy_file(self) -> np.array:
+	def read_average_entropy_file(self, file) -> np.array:
 		
-		average_SE_file = os.path.join(self.se_folder, self.average_SE_file)
+		average_SE_file = os.path.join(self.se_folder, file)
 
 		if not exists(average_SE_file):
 			print(f"\t\t[W]  Can't open average entropy file located at {average_SE_file}\n\n")
@@ -126,29 +126,6 @@ class Analyse:
 					average_SEs[self.msa_links[res_num]] = float(average)
 
 		return average_SEs
-	
-	def read_summed_entropy_file(self) -> np.array:
-
-		summed_entropy_file = os.path.join(self.se_folder, self.summed_entropy_file)
-
-		if not exists(summed_entropy_file):
-			print(f"\t\t[W]  Can't open summed entropy file located at {summed_entropy_file}\n\n")
-			return -1
-		
-		summed_SEs = np.zeros(len(self.msa_links.keys()))
-		with open(summed_entropy_file,'r') as IN:
-			for line in IN:
-				line = line.strip()
-				if line == "":
-					continue
-				if line[0] == "#":
-					continue
-				res_num,summed = line.split("\t")
-				res_num = int(res_num)
-				if res_num in self.msa_links.keys():
-					summed_SEs[self.msa_links[res_num]] = float(summed)
-
-		return summed_SEs
 	
 
 	def read_consensus_file(self) -> list:
@@ -235,20 +212,19 @@ class Plot:
 	"""
 	Create some of the plots for the TEA analysis
 	"""
-	# TODO ADD TYPES HERE!! 
 	def __init__(self, 
-			  data, 
-			  mode, 
-			  subset=None,
-			  summed_SEs=None,
-			  average_SEs=None,
+			  data: dict, 
+			  mode: str, 
+			  subset: dict=None,
+			  tea_average_SEs: np.array=None,
+			  teao_average_SEs: np.array=None,
 			  highlights=None):
 
 		self.data = data
 		self.mode = mode
 		self.subset = subset
-		self.summed_SEs = summed_SEs
-		self.average_SEs = average_SEs
+		self.tea_average_SEs = tea_average_SEs
+		self.teao_average_SEs = teao_average_SEs
 		self.highlights = highlights
 		
 		self.segment_threshold  = None
@@ -290,15 +266,14 @@ class Plot:
 		subset_values = set(value for values in self.subset.values() for value in values)
 		self.res_nums = [resnum for resnum in self.res_nums if resnum in subset_values]
 		# Loop over data and remove resnums that are not in subset
-		if not self.average_SEs is None:
-			tmp = [self.average_SEs[x] for x in self.res_nums]
-			self.average_SEs = tmp
-		if not self.summed_SEs is None:
-			tmp = [self.summed_SEs[x] for x in self.res_nums]
-			self.summed_SEs = tmp
+		if not self.teao_average_SEs is None:
+			tmp = [self.teao_average_SEs[x] for x in self.res_nums]
+			self.teao_average_SEs = tmp
+		if not self.tea_average_SEs is None:
+			tmp = [self.tea_average_SEs[x] for x in self.res_nums]
+			self.tea_average_SEs = tmp
 		self.data = {k: v for k, v in self.data.items() if k in self.res_nums}
 	
-
 	def _segment_data(self):
 		"""
 		If subsets are provided, segments the data
@@ -352,27 +327,27 @@ class Plot:
 
 			# plot shannon entropy
 			gs_pos = gs_master[0, col]
-			ax = self.se_graphing(segment, graph=master_fig, gs_pos=gs_pos)
+			_, ax = self.se_graphing(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# plot specificity
 			gs_pos = gs_master[1, col]
-			ax = self.specificity_graphing(segment, graph=master_fig, gs_pos=gs_pos)
+			_, ax = self.specificity_graphing(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# plot residue presence matrix
 			gs_pos = gs_master[2:4, col]
-			ax = self.residue_presence_matrix(segment, graph=master_fig, gs_pos=gs_pos)
+			_, ax = self.residue_presence_matrix(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# number of residues
 			gs_pos = gs_master[5, col]
-			ax = self.number_of_residues(segment, graph=master_fig, gs_pos=gs_pos)
+			_, ax = self.number_of_residues(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# residue distribution
 			gs_pos = gs_master[6, col]
-			ax = self.residue_distribution(segment, graph=master_fig, gs_pos=gs_pos)
+			_, ax = self.residue_distribution(segment, graph=master_fig, gs_pos=gs_pos)
 
 			# zscale distribution
 			gs_pos = gs_master[7, col]
-			ax = self.zscale_distribution(segment, graph=master_fig, gs_pos=gs_pos)
+			_, ax = self.zscale_distribution(segment, graph=master_fig, gs_pos=gs_pos)
 
 			segment_index += 1
 
@@ -396,7 +371,10 @@ class Plot:
 		indexes = [self.res_nums[segment].index(val) for val in x_val]
 		se_values = [self.data[x]["SE"] for x in x_val]
 		ax.plot(x_val, se_values, linewidth=0.5,color='k', zorder=10)
-		avg_se_values = [self.average_SEs[index] for index in indexes]
+		if self.mode == "TEA":
+			avg_se_values = [self.tea_average_SEs[index] for index in indexes]
+		elif self.mode == "TEAO":
+			avg_se_values = [self.teao_average_SEs[index] for index in indexes]
 		ax.plot(x_val, avg_se_values, linewidth=0.5,color='b')
 
 		## Add "Highlighted Entropy Zones"
@@ -412,14 +390,14 @@ class Plot:
 			ax.plot([x-0.5,x-0.5],[-0.05,1.05],color='w',linestyle='-',linewidth=0.75)
 
 		# Highlight residues with near equal representation in MSA
-		# for i,val_x in enumerate(x_val):
-		# 	num_res = self.data[val_x]["NUM_RES"]
-		# 	num_res -= 1 if '-' in self.data[val_x]["RES_COUNTS"].keys() else 0
-		# 	num_res -= 1 if 'X' in self.data[val_x]["RES_COUNTS"].keys() else 0
-		# 	ax.plot(val_x,self.data[val_x]["SE"],marker="*",markersize=10*(1-self.data[val_x]["DEV"]),color='b')
-		# 	self.num_ress[i] = num_res
-		# 	if num_res < 10:
-		# 		continue
+		for i,val_x in enumerate(x_val):
+			num_res = self.data[val_x]["NUM_RES"]
+			num_res -= 1 if '-' in self.data[val_x]["RES_COUNTS"].keys() else 0
+			num_res -= 1 if 'X' in self.data[val_x]["RES_COUNTS"].keys() else 0
+			ax.plot(val_x,self.data[val_x]["SE"],marker="*",markersize=10*(1-self.data[val_x]["DEV"]),color='b')
+			self.num_ress[i] = num_res
+			if num_res < 10:
+				continue
 
 		## Prettify the Y-axis
 		ax.yaxis.set_ticks([i*0.2 for i in range(int(1/0.2)+1)])
@@ -429,7 +407,7 @@ class Plot:
 				ax.yaxis.set_ticks([])
 				ax.yaxis.set_ticklabels([])
 
-		ax.tick_params(axis='x',which='both',left=False,labelleft=False)
+		ax.tick_params(axis='x',which='both',left=False,labelleft=False,bottom=False,labelbottom=False)
 		ax.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
 		ax.spines['bottom'].set_visible(False)
 
@@ -452,7 +430,10 @@ class Plot:
 		x_val = self.res_nums[segment]
 		indexes = [self.res_nums[segment].index(val) for val in x_val]
 		se_values = np.array([self.data[x]["SE"] for x in x_val])  # Shannon Entropies for the reference
-		avg_se_values = [self.average_SEs[index] for index in indexes]  # Average Shannon Entropies for the reference
+		if self.mode == "TEA":
+			avg_se_values = [self.tea_average_SEs[index] for index in indexes]
+		elif self.mode == "TEAO":
+			avg_se_values = [self.teao_average_SEs[index] for index in indexes]  # Average Shannon Entropies for the reference
 
 		rotate_deg = np.deg2rad(45)
 		sin_val = np.sin(rotate_deg)
@@ -484,6 +465,10 @@ class Plot:
 			if (gs_pos.colspan.start > 0):
 				ax.yaxis.set_ticks([])
 				ax.yaxis.set_ticklabels([])
+
+		# Remove whitespace on x-axis
+		ax.set_xlim([(x_val[0]-0.5),x_val[-1]+0.5])
+		ax.tick_params(axis='x',which='both',left=False,labelleft=False,bottom=False,labelbottom=False)
 
 		return graph, ax
 
@@ -604,6 +589,7 @@ class Plot:
 		
 		# res_num_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
 		# ax.xaxis.set_minor_locator(MultipleLocator(1))
+		ax.set_xlim([(x_val[0]-0.5),x_val[-1]+0.5])
 		ax.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
 		ax.tick_params(axis='x',which='minor',top=False,bottom=False)
 
@@ -625,6 +611,7 @@ class Plot:
 		ax.spines['top'].set_visible(False)
 		ax.spines['bottom'].set_visible(False)
 
+		
 		return graph, ax
 
 	def residue_distribution(self, segment, graph=plt.figure(figsize=(20, 5)), gs_pos=111):
@@ -707,91 +694,50 @@ class Plot:
 
 		## Setup X-Axis
 		labels = [f"{val_x+1: >{len(str(len(x_val)))+1}}" if val_x%2 != 0 else "" for val_x in x_val]
-		ax.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=self.font_size,va='center',ha='center')
 		# ax.xaxis.set_ticks([i for i in x_val])
-		# Turn on X-axis gridlines using the minor ticks
-		ax.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
-
-		# Hide the top and bottom axes
-		ax.spines['top'].set_visible(False)
-		ax.spines['bottom'].set_visible(False)
+		ax.set_xlim([(x_val[0]-0.5),x_val[-1]+0.5])
+		# Set major tick for each residue [0 to pos-1]
+		ax.xaxis.set_ticks([i for i in x_val])
+		# Set and rotate major tick labels
+		ax.set_xticklabels(labels=labels,rotation='vertical',fontsize=self.font_size,va='center',ha='center')
+		ax.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
+		ax.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
 
 		return graph, ax
 
 
 	def global_vs_subfam(self, figsize=(5, 5)):
-		# TODO Add highlight option here
+
+		# TODO Add highlights here as well to highlight residues in scatterplot.
+
 		f, ax = plt.subplots(figsize=figsize)
 		if self.mode == "TEA":
-			# print("TEA mode", len(self.summed_SEs), len([self.data[i]['SE'] for i in self.data]))
-			ax.scatter(self.summed_SEs, np.array([self.data[i]['SE'] for i in self.data]))
-			ax.set_xlabel('Summed subfamily entropy')
+			ax.scatter(self.tea_average_SEs, np.array([self.data[i]['SE'] for i in self.data]))
+			ax.set_xlabel('Average entropy')
 		elif self.mode == "TEAO":
-			ax.scatter(self.average_SEs, np.array([self.data[i]['SE'] for i in self.data]))
-			ax.set_xlabel('Average subfamily entropy')
+			ax.scatter(self.teao_average_SEs, np.array([self.data[i]['SE'] for i in self.data]))
+			ax.set_xlabel('Average entropy')
 		ax.set_ylabel('Global entropy')
 		ax.legend()
 		return f, ax
 	
 	def global_vs_subfam_interactive(self, width=800, height=800):
 		if self.mode == "TEAO":
-			fig = px.scatter(x=self.average_SEs, 
+			fig = px.scatter(x=self.teao_average_SEs, 
 							 y=np.array([self.data[i]['SE'] for i in self.data]),
 							hover_name=np.array([self.data[i]['RES'] for i in self.data]),
 							hover_data={"MSA_POS": np.array([self.data[i]['MSA_POS'] for i in self.data]),
 										"CON_RES": np.array([self.data[i]['CON_RES'] for i in self.data])},
 							width=width,
 							height=height)
-			fig.update_layout(title='Average vs Global subfamily entropy', xaxis_title='Average subfamily entropy', yaxis_title='Global entropy')
+			fig.update_layout(title='Average vs Global entropy', xaxis_title='Average entropy', yaxis_title='Global entropy')
 		elif self.mode == "TEA":
-			fig = px.scatter(x=self.summed_SEs, 
+			fig = px.scatter(x=self.tea_average_SEs, 
 					y=np.array([self.data[i]['SE'] for i in self.data]),
 					hover_name=np.array([self.data[i]['RES'] for i in self.data]),
+					hover_data={"MSA_POS": np.array([self.data[i]['MSA_POS'] for i in self.data]),
+								"CON_RES": np.array([self.data[i]['CON_RES'] for i in self.data])},
 					width=width,
 					height=height)
-			fig.update_layout(title='Summed vs Global subfamily entropy', xaxis_title='Summed subfamily entropy', yaxis_title='Global entropy')
+			fig.update_layout(title='Average vs Global entropy', xaxis_title='Average entropy', yaxis_title='Global entropy')
 		return fig
-	
-	# def plot_with_broken_axis(self, graph=None, figsize=(15, 5), **kwargs):
-	# 	"""
-	# 	Creates a plot with broken axes if the data contains large gaps and adds vertical lines at breaks.
-
-	# 	Args:
-	# 		graph (matplotlib.axes.Axes): Existing subplot, if any.
-	# 		figsize (tuple): Figure size, e.g., (15, 5).
-	# 		**kwargs: Additional plotting options.
-	# 	"""
-	# 	# Segment data
-	# 	self.segments = self._segment_data()  # Assume this returns slices
-	# 	n_segments = len(self.segments)
-
-	# 	# Create figure using gridspec for better control
-	# 	fig = plt.figure(figsize=figsize)
-	# 	gs = gridspec.GridSpec(1, n_segments, width_ratios=[1] * n_segments, wspace=0.1)
-	# 	axes = [fig.add_subplot(gs[i]) for i in range(n_segments)]
-
-	# 	# Plot each segment
-	# 	for ax, segment in zip(axes, self.segments):
-	# 		self._plot_segment(ax, segment, **kwargs)
-
-	# 	# Add vertical lines at breaks
-	# 	for i in range(1, n_segments):  # Start from the second segment
-	# 		# Get the rightmost x-coordinate of the previous segment
-	# 		prev_segment = self.segments[i - 1]
-	# 		prev_max_x = max(self.res_nums[prev_segment])  # Use the slice to get the max x
-
-	# 		# Draw vertical line on the left of the current segment
-	# 		axes[i].axvline(prev_max_x, color='black', linestyle='--', linewidth=2)
-
-	# 	# Remove unnecessary ticks/labels
-	# 	for i, ax in enumerate(axes):
-	# 		if i > 0:
-	# 			ax.set_ylabel('')  # Remove the y-label
-	# 			ax.spines['left'].set_visible(False)
-	# 			ax.tick_params(left=False, labelleft=False)
-
-	# 	# Add broken axis lines
-	# 	self._add_broken_axis_lines(axes)
-
-	# 	# Final adjustments
-	# 	plt.tight_layout(pad=0)
