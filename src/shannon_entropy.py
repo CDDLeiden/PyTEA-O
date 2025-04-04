@@ -255,6 +255,8 @@ def run(args:dict) -> None:
 
 	# Default settings
 	shannon_entropy_file = "shannon_entropy.txt"
+	tea_shannon_entropy_file = "tea_average_shannon_entropy.txt"
+	teao_shannon_entropy_file = "teao_average_shannon_entropy.txt"
 	logo_file = "consensus_logo.txt"
 
 	makedirs(outpath,mode=0o755,exist_ok=True)
@@ -268,13 +270,16 @@ def run(args:dict) -> None:
 
 	start = time()
 	results = shannon_entropy(msa=msas)
+	min_entropy = min([x[0] for x in results.values()])
+	max_entropy = max([x[0] for x in results.values()])
+
 	print(f"Global SE calculated for {n_seq} (nres = {n_res}) in {(time()-start):.2f}s")
 
 	with open(f"{outpath}/{shannon_entropy_file}",'w') as OUT:
 		OUT.write(f"## MSA_position\tShannon_Entropy\tFract_Shannon_Entropy\tSequences_at_pos\tNum_of_gaps\n")
 		for res_num in sorted(results.keys()):
 			sh_entropy,non_gapped_res,num_of_gaps,_ = results[res_num]
-			OUT.write(f"{res_num: >{msa_buffer}d}\t{sh_entropy: >.2f}\t{sh_entropy/max_sh_entropy: >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps}\n")
+			OUT.write(f"{res_num: >{msa_buffer}d}\t{sh_entropy: >.2f}\t{(sh_entropy-(min_entropy))/(max_entropy-(min_entropy)): >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps}\n")
 
 	with open(f"{outpath}/{logo_file}",'w') as OUT:
 		OUT.write(f"## MSA_position\tRes:Count;\n")
@@ -293,7 +298,7 @@ def run(args:dict) -> None:
 			OUT.write(f"## Sequence_Pos\tMSA_Pos\tResidue\tShannon_Entropy\tFract_Shannon_Entropy\tSequences_at_pos\tNum_of_gaps\n")
 			for res_index,msa_index in enumerate(indexs):
 				sh_entropy,non_gapped_res,num_of_gaps,_ = results[msa_index]
-				OUT.write(f"{res_index: <{res_buffer}d}\t{msa_index: >{msa_buffer}d}\t{msas.loc[reference][msa_index]}\t{sh_entropy: >.2f}\t{sh_entropy/max_sh_entropy: >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps: >{msa_buffer}}\n")
+				OUT.write(f"{res_index: <{res_buffer}d}\t{msa_index: >{msa_buffer}d}\t{msas.loc[reference][msa_index]}\t{sh_entropy: >.2f}\t{(sh_entropy-(min_entropy))/(max_entropy-(min_entropy)): >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps: >{msa_buffer}}\n")
 
 	if path_subfamilies and exists(path_subfamilies) and (mode == "TEAO"):
 
@@ -391,9 +396,10 @@ def run(args:dict) -> None:
 					branch_start = time()
 
 		SEs = np.divide(np.sum(SEs,axis=0),total_branch_points)
+		SEs_norm = (SEs - np.min(SEs)) / (np.max(SEs) - np.min(SEs))
 
-		with open(f"{outpath}/teao_average_shannon_entropy.txt",'w') as OUT:
-			for msa_pos,se in enumerate(SEs):
+		with open(f"{outpath}/{teao_shannon_entropy_file}",'w') as OUT:
+			for msa_pos,se in enumerate(SEs_norm):
 				OUT.write(f"{msa_pos: <{msa_buffer}}\t{se:.2f}\n")
 
 		print(f"\nTask completed after a total runtime of {give_me_time(time()-total_start)}\n")
@@ -429,7 +435,7 @@ def run(args:dict) -> None:
 						results = np.array(results)
 						E_i = np.divide(np.sum(results,axis=0),m)
 
-		with open(f"{outpath}/tea_average_shannon_entropy.txt",'w') as OUT:
+		with open(f"{outpath}/{tea_shannon_entropy_file}",'w') as OUT:
 			for msa_pos,se in enumerate(E_i):
 				OUT.write(f"{msa_pos}\t{se:.2f}\n")
 

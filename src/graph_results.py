@@ -135,6 +135,9 @@ def __read_SE_data(SE_file:str=None) -> list:
 
 def __read_zscale_data(zscale_file:str=None,data:dict=None,msa_links:dict=None) -> dict:
 
+	if zscale_file is None or not exists(zscale_file):
+		return None
+
 	with open(zscale_file,'r') as IN:
 		for line in IN:
 			line = line.strip()
@@ -177,7 +180,7 @@ def plot(args=None) -> None:
 	# Read in Average Shannon Entropy
 	ase_values = __read_average_entropy_file(average_SE_file=average_SE_file,msa_links=msa_links)
 
-	# Read in Concensus Sequence
+	# Read in Consensus Sequence
 	data = __read_consensus_file(consensus_file=consensus_file,data=data,msa_links=msa_links)
 
 	# Read in residues to highlight in the graphic
@@ -186,15 +189,14 @@ def plot(args=None) -> None:
 	# Read in Z-Scale data
 	zscales = __read_zscale_data(zscale_file=zscale_file,data=data,msa_links=msa_links)
 	
-	# Read subset file and filter data
+	# Read subset file and filter data to only include subset residues
 	subset = __read_res_highlight_subset_file(file=subset_file)
-	subset_pos = set(v for v in subset.values() for v in v)
-	subset_indices = np.array(sorted(subset_pos), dtype=int)
-	# filter data to only include subset residues
 	if subset_file is not None:
+		subset_pos = set(v for v in subset.values() for v in v)
+		subset_indices = np.array(sorted(subset_pos), dtype=int)
 		data = {key: value for key, value in data.items() if key in subset_pos}
 		ase_values = ase_values[subset_indices]
-		
+	
 	# Reference residue sequences
 	res_nums = sorted(data.keys())
 
@@ -367,8 +369,8 @@ def plot(args=None) -> None:
 	# ###########################################################
 	# ## Hightlight user-provided residues
 	# ###########################################################
-
-	if exists(highlight_file):
+	if (highlight_file is not None) and exists(highlight_file):
+		print("does not exist")
 		rand_colors = sample(range(len(color_keys)),len(highlights.keys()))
 		for index,source in enumerate(highlights.keys()):
 			for val_x in highlights[source]:
