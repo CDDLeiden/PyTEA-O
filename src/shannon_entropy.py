@@ -279,7 +279,7 @@ def run(args:dict) -> None:
 		OUT.write(f"## MSA_position\tShannon_Entropy\tFract_Shannon_Entropy\tSequences_at_pos\tNum_of_gaps\n")
 		for res_num in sorted(results.keys()):
 			sh_entropy,non_gapped_res,num_of_gaps,_ = results[res_num]
-			OUT.write(f"{res_num: >{msa_buffer}d}\t{sh_entropy: >.2f}\t{(sh_entropy-(min_entropy))/(max_entropy-(min_entropy)): >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps}\n")
+			OUT.write(f"{res_num: >{msa_buffer}d}\t{sh_entropy: >.2f}\t{1-((sh_entropy-(min_entropy))/(max_entropy-(min_entropy))): >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps}\n")
 
 	with open(f"{outpath}/{logo_file}",'w') as OUT:
 		OUT.write(f"## MSA_position\tRes:Count;\n")
@@ -298,7 +298,7 @@ def run(args:dict) -> None:
 			OUT.write(f"## Sequence_Pos\tMSA_Pos\tResidue\tShannon_Entropy\tFract_Shannon_Entropy\tSequences_at_pos\tNum_of_gaps\n")
 			for res_index,msa_index in enumerate(indexs):
 				sh_entropy,non_gapped_res,num_of_gaps,_ = results[msa_index]
-				OUT.write(f"{res_index: <{res_buffer}d}\t{msa_index: >{msa_buffer}d}\t{msas.loc[reference][msa_index]}\t{sh_entropy: >.2f}\t{(sh_entropy-(min_entropy))/(max_entropy-(min_entropy)): >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps: >{msa_buffer}}\n")
+				OUT.write(f"{res_index: <{res_buffer}d}\t{msa_index: >{msa_buffer}d}\t{msas.loc[reference][msa_index]}\t{sh_entropy: >.2f}\t{(1-(sh_entropy-(min_entropy))/(max_entropy-(min_entropy))): >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps: >{msa_buffer}}\n")
 
 	if path_subfamilies and exists(path_subfamilies) and (mode == "TEAO"):
 
@@ -397,6 +397,7 @@ def run(args:dict) -> None:
 
 		SEs = np.divide(np.sum(SEs,axis=0),total_branch_points)
 		SEs_norm = (SEs - np.min(SEs)) / (np.max(SEs) - np.min(SEs))
+
 
 		with open(f"{outpath}/{teao_shannon_entropy_file}",'w') as OUT:
 			for msa_pos,se in enumerate(SEs_norm):
