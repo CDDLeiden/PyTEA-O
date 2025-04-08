@@ -156,24 +156,13 @@ def __read_zscale_data(zscale_file:str=None,data:dict=None,msa_links:dict=None) 
 	
 	return data
 
-
-def plot(args=None) -> None:
-
-	SE_file=args.shannon_entropy_file
-	consensus_file=args.consensus_sequence_file
-	highlight_file=args.highlight_residues
-	average_SE_file=args.average_entropy_file
-	subset_file=args.subset_file
-	config_file=args.configuration
-	zscale_file=args.zscale_file
-	output_dir=args.outdir
-
-	aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
-	scales = ['Z1','Z2','Z3']
-
-	# Read in configuration file
-	config = __read_configuration_file(config_file=config_file)
-	
+def read_data(SE_file:str=None,
+			  consensus_file:str=None,
+			  highlight_file:str=None,
+			  average_SE_file:str=None,
+			  subset_file:str=None,
+			  zscale_file:str=None):
+		
 	# Read in Shannon Entropy
 	data,msa_links = __read_SE_data(SE_file=SE_file)
 
@@ -196,6 +185,21 @@ def plot(args=None) -> None:
 		subset_indices = np.array(sorted(subset_pos), dtype=int)
 		data = {key: value for key, value in data.items() if key in subset_pos}
 		ase_values = ase_values[subset_indices]
+
+	return data, ase_values, highlights
+	
+
+def plot(data:dict=None,
+		 highlights:dict=None,
+		 ase_values:np.array=None,
+		 config_file=None,
+		 fname_out=None) -> None:
+
+	aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
+	scales = ['Z1','Z2','Z3']
+
+	# Read in configuration file
+	config = __read_configuration_file(config_file=config_file)
 	
 	# Reference residue sequences
 	res_nums = sorted(data.keys())
@@ -369,8 +373,7 @@ def plot(args=None) -> None:
 	# ###########################################################
 	# ## Hightlight user-provided residues
 	# ###########################################################
-	if (highlight_file is not None) and exists(highlight_file):
-		print("does not exist")
+	if highlights is not None:
 		rand_colors = sample(range(len(color_keys)),len(highlights.keys()))
 		for index,source in enumerate(highlights.keys()):
 			for val_x in highlights[source]:
@@ -574,25 +577,29 @@ def plot(args=None) -> None:
 	# # ## SAVING FILES
 	# # ###################################################################################################################
 
-	file_prefix = SE_file.split("/")[-1].split(".")[0]
-	makedirs(output_dir,mode=0o755,exist_ok=True)
 	fig.set_size_inches(width,10)
 	plt.tight_layout()
-	plt.savefig(f"{output_dir}/{file_prefix}.png",dpi=500)
+	plt.savefig(fname_out,dpi=500)
 	
 	return None
 
 def run(args=None) -> None:
 
-	plot(SE_file=args.shannon_entropy_file,
-	     output_dir=args.outdir,
-		 highlight_file=args.highlight_residues,
-	     consensus_file=args.consensus_sequence_file,
-		 average_SE_file=args.average_entropy_file,
-		 zscale_file=args.zscale_file,
-		 subset_file=args.subset_file,
-		 config_file=args.configuration)
+	ref = args.shannon_entropy_file.split("/")[-1].split(".")[0]
+	makedirs(args.outdir,mode=0o755,exist_ok=True)
 
+	data, ase_values, highlights = read_data(SE_file=args.shannon_entropy_file,
+										     consensus_file=args.consensus_sequence_file,
+											 highlight_file=args.highlight_residues,
+											 average_SE_file=args.average_entropy_file,
+											 subset_file=args.subset_file,
+											 zscale_file=args.zscale_file)
+	plot(data=data,
+	     highlights=highlights,
+		 ase_values=ase_values,
+		 config_file=args.configuration,
+		 fname_out=f"{args.outdir}/{ref}.png")
+	
 	return None
 
 if __name__ == "__main__":
@@ -610,4 +617,4 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-f","--subset_file",required=False,type=str)
 	GetOptions.add_argument("-l","--configuration",required=False,type=str)
 
-	plot(args=GetOptions.parse_known_args()[0])
+	run(args=GetOptions.parse_known_args()[0])
