@@ -1,4 +1,8 @@
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+
 DB_files/names.dmp
 DB_files/nodes.dmp
 DB_files/prot.accession2taxid.FULL.gz

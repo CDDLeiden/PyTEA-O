@@ -12,7 +12,7 @@ from os.path import exists
 from time import time
 
 multiprocessing = None
-if 'linux' in sys.platform: multiprocessing = 'multiprocessing'
+if 'linux' or 'win' in sys.platform: multiprocessing = 'multiprocessing'
 elif 'darwin' in sys.platform: multiprocessing = 'multiprocess'
 elif 'win' in sys.platform: multiprocessing = 'multiprocessing'
 mp = __import__(multiprocessing)

@@ -4,11 +4,8 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-import seaborn as sns
-from Bio import AlignIO
-import matplotlib.pyplot as plt
 from prodec import ProteinDescriptors
-from sklearn.preprocessing import MinMaxScaler
+from shannon_entropy import load_msa
 
 
 def calculate_protein_descriptor(aligned_sequences:list, descriptor:str) -> pd.DataFrame:
@@ -22,14 +19,9 @@ def calculate_protein_descriptor(aligned_sequences:list, descriptor:str) -> pd.D
 	result = prodec_descriptor.pandas_get(aligned_sequences, gaps=0.0)
 	return result
 
-def read_alignment(fp, extension="fasta"):
-    return AlignIO.read(fp, extension)
-
 def scale_df(arr):
 	df = pd.DataFrame(arr)
-	df.head()
-	scaler = MinMaxScaler()
-	df_scaled = pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
+	df_scaled = (df - df.min()) / (df.max() - df.min())
 	return df_scaled
 
 def std(df):
@@ -45,24 +37,6 @@ def reshape_df(df):
 			count += 1
 	return matrix
 
-# def heatmap(df_zscales, xlabels):
-#     fig, ax = plt.subplots(figsize=(5, 5))
-#     sns.heatmap(df_zscales, ax=ax, cmap='Reds', annot=False, cbar=False)
-#     ax.xaxis.tick_bottom()
-#     ax.patch.set_alpha(0)
-#     ax.set_xlabel('Residue')
-#     ax.set_ylabel('Z-scale')
-#     # put the major ticks at the middle of each cell
-#     ax.set_xticks(np.arange(df_zscales.shape[1]) + 0.5, minor=False)
-#     ax.set_yticks(np.arange(df_zscales.shape[0]) + 0.5, minor=False)
-#     return fig, ax
-
-def get_residues_per_position(msa):
-	positions = {}
-	for num, record in enumerate(msa):
-		positions[num] = [aa for aa in record.seq]
-	return positions
-
 def run(args=None):
 
 	zscales_file = 'zscales.txt'
@@ -71,11 +45,8 @@ def run(args=None):
 	if not os.path.exists(args.outdir):
 		os.makedirs(args.outdir)
 	
-	# desc_factory = ProteinDescriptors()
-	msa = read_alignment(args.msa_file)
-
-	# Get positions from the msa
-	positions = get_residues_per_position(msa)
+	msa = load_msa(args.msa_file)
+	positions = {i: row.tolist() for i, (_, row) in enumerate(msa.iterrows())}
 
 	# Calculate Z-scales
 	truncated_sequences = []
@@ -104,7 +75,7 @@ def run(args=None):
 									4: 'Z5'}, inplace=True)
 	
 	# Add msa positions to dataframe
-	msa_positions = [i for i in range(len(msa[0].seq))]
+	msa_positions = [i for i in range(len(truncated_sequences[0]))]
 	z_scales_scaled = z_scales_scaled.apply(pd.to_numeric, errors='coerce')
 	z_scales_scaled['MSA_position'] = msa_positions
 
