@@ -581,7 +581,7 @@ def plot(data:dict=None,
 	plt.tight_layout()
 	plt.savefig(fname_out,dpi=500)
 	
-	return None
+	return fig
 
 def run(args=None) -> None:
 

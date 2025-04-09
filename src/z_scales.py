@@ -18,10 +18,8 @@ def calculate_protein_descriptor(aligned_sequences:list, descriptor:str) -> pd.D
 	desc_factory = ProteinDescriptors()
 	print(f"Calculating {descriptor} descriptor")
 	prodec_descriptor = desc_factory.get_descriptor(descriptor)
-	print(f"Descriptor: {prodec_descriptor}")
 	# result = prodec_descriptor.pandas_get(aligned_sequences, gaps='omit')
 	result = prodec_descriptor.pandas_get(aligned_sequences, gaps=0.0)
-	print(f"Result: {result}")
 	return result
 
 def read_alignment(fp, extension="fasta"):
@@ -75,25 +73,19 @@ def run(args=None):
 	
 	# desc_factory = ProteinDescriptors()
 	msa = read_alignment(args.msa_file)
-	print(f"MSA length: {len(msa)}")
 
 	# Get positions from the msa
 	positions = get_residues_per_position(msa)
-	# print(f"Positions: {len(positions)}")
-	# print(f"Positions: {positions}")
 
 	# Calculate Z-scales
 	truncated_sequences = []
 	for _, v in positions.items():
 		truncated_sequences.append(''.join(v))
-	print(f"Truncated sequences: {len(truncated_sequences[0])}")
-	# print(f"Truncated sequences: {truncated_sequences}")
 
 	# Check for unknown amino acids
 	truncated_sequences = [''.join([aa if aa in 'ACDEFGHIKLMNPQRSTVWY' else '-' for aa in seq]) for seq in truncated_sequences]
 
 	z_scales = calculate_protein_descriptor(truncated_sequences, 'Zscale Sandberg')
-	print(f"Z-scales: {len(z_scales)}")
 
 	# Replace the 0s (gaps) by NaN
 	z_scales.replace(0, np.nan, inplace=True)
@@ -115,9 +107,6 @@ def run(args=None):
 	msa_positions = [i for i in range(len(msa[0].seq))]
 	z_scales_scaled = z_scales_scaled.apply(pd.to_numeric, errors='coerce')
 	z_scales_scaled['MSA_position'] = msa_positions
-	print(f"Z-scales scaled: {z_scales_scaled}")
-	print(f"Z-scales scaled columns: {z_scales_scaled['MSA_position']}")
-
 
 	# Save Zscales to file
 	with open(f"{args.outdir}/{zscales_file}",'w') as OUT:

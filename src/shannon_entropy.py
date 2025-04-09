@@ -14,6 +14,7 @@ from time import time
 multiprocessing = None
 if 'linux' in sys.platform: multiprocessing = 'multiprocessing'
 elif 'darwin' in sys.platform: multiprocessing = 'multiprocess'
+elif 'win' in sys.platform: multiprocessing = 'multiprocessing'
 mp = __import__(multiprocessing)
 
 def get_reference_indexs(ref:str,msas:pd.DataFrame) -> list:
@@ -435,9 +436,11 @@ def run(args:dict) -> None:
 							results = executor.map(calc_summed_entropy,[msas.loc[family] for family in families.values()])
 						results = np.array(results)
 						E_i = np.divide(np.sum(results,axis=0),m)
+						E_i_norm = (E_i - np.min(E_i)) / (np.max(E_i) - np.min(E_i))
+
 
 		with open(f"{outpath}/{tea_shannon_entropy_file}",'w') as OUT:
-			for msa_pos,se in enumerate(E_i):
+			for msa_pos,se in enumerate(E_i_norm):
 				OUT.write(f"{msa_pos}\t{se:.2f}\n")
 
 	# load_similarity_matrix(matrix=sim_mat)
