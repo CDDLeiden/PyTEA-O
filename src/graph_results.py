@@ -28,7 +28,7 @@ def __read_configuration_file(config_file:str=None) -> dict:
 	return config
 
 
-def __read_average_entropy_file(average_SE_file:str=None,msa_links:dict=None) -> np.array:
+def __read_average_entropy_file(average_SE_file:str=None,msa_links:dict=None,data:dict=None) -> np.array:
 	
 	if not exists(average_SE_file):
 		print(f"\t\t[W]  Can't open average entropy file located at {average_SE_file}\n\n")
@@ -46,8 +46,9 @@ def __read_average_entropy_file(average_SE_file:str=None,msa_links:dict=None) ->
 			res_num = int(res_num)
 			if res_num in msa_links.keys():
 				average_SEs[msa_links[res_num]] = float(average)
+				data[msa_links[res_num]]["ASE"] = float(average)
 
-	return average_SEs
+	return average_SEs, data
 
 def __read_consensus_file(consensus_file:str=None,data:dict=None,msa_links:dict=None) -> list:
 
@@ -167,7 +168,8 @@ def read_data(SE_file:str=None,
 	data,msa_links = __read_SE_data(SE_file=SE_file)
 
 	# Read in Average Shannon Entropy
-	ase_values = __read_average_entropy_file(average_SE_file=average_SE_file,msa_links=msa_links)
+	# TODO Remove ase_values from data
+	ase_values, data = __read_average_entropy_file(average_SE_file=average_SE_file,msa_links=msa_links,data=data)
 
 	# Read in Consensus Sequence
 	data = __read_consensus_file(consensus_file=consensus_file,data=data,msa_links=msa_links)
@@ -184,7 +186,7 @@ def read_data(SE_file:str=None,
 		subset_pos = set(v for v in subset.values() for v in v)
 		subset_indices = np.array(sorted(subset_pos), dtype=int)
 		data = {key: value for key, value in data.items() if key in subset_pos}
-		ase_values = ase_values[subset_indices]
+		# ase_values = ase_values[subset_indices]
 
 	return data, ase_values, highlights
 	
@@ -297,6 +299,7 @@ def plot(data:dict=None,
 
 	# Shannon Entropies for the reference
 	se_values = np.array([data[x]["SE"] for x in res_nums])
+	ase_values = np.array([data[x]["ASE"] for x in res_nums])
 
 	# Residue and residue number labels
 	# labels = [f"{data[x]["RES"]} [{x+1}]" if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
@@ -332,6 +335,7 @@ def plot(data:dict=None,
 
 		## Plot the data
 		se_graph.plot(res_nums,se_values,linewidth=0.5,color='k')
+		se_graph.plot(res_nums,ase_values,linewidth=0.5,color='b')
 
 		## Prettify the Y-axis
 		se_graph.yaxis.set_ticks([i*0.2 for i in range(int(1/0.2)+1)])
@@ -342,7 +346,7 @@ def plot(data:dict=None,
 		se_graph.spines['bottom'].set_visible(False)
 
 		# ase_graph = se_graph.twinx()
-		se_graph.plot(res_nums,[ase_values[x] for x in res_nums],linewidth=0.5,color='b')
+		# se_graph.plot(res_nums,[ase_values[x] for x in res_nums],linewidth=0.5,color='b')
 
 	# ####################################################################################################################
 	# ## Specificity/Conservation Scoring
@@ -352,7 +356,6 @@ def plot(data:dict=None,
 	sin_val = np.sin(rotate_deg)
 	cos_val = np.cos(rotate_deg)
 	off = 0.5
-	ase_values = ase_values
 	h = np.sqrt(np.square(ase_values)+np.square(se_values))
 	cons = np.zeros(h.shape)
 	np.seterr(divide='ignore',invalid='ignore')
@@ -422,12 +425,13 @@ def plot(data:dict=None,
 
 		## Setup X-Axis
 		# Set major tick for each residue [0 to pos-1]
-		res_mat_graph.xaxis.set_ticks([i-1 for i in range(len(res_nums)+1)])
+		# res_mat_graph.xaxis.set_ticks([i-1 for i in range(len(res_nums)+1)])
+		res_mat_graph.xaxis.set_ticks(range(len(res_nums)))
 		# Set and rotate major tick labels
 		if res_mat_graph == first_plot:
 			labels = [None for val_x in res_nums]
 		else:
-			labels = [f"{val_x: >{len(str(len_of_seq))+1}}" if val_x%2 == 0 else "" for val_x in range(len(res_nums)+1)]
+			labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
 		res_mat_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
 		# Show major tick labels, but not the ticks themselves, and only on the top
 		res_mat_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=True,labelbottom=False)
@@ -444,7 +448,8 @@ def plot(data:dict=None,
 
 		# Turn on X-axis gridlines using the minor ticks
 		res_mat_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
-		res_mat_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
+		# res_mat_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
+		# res_mat_graph.set_xlim([0,50])
 
 	# ####################################################################################################################
 	# ## Number of Residue Bar Graph
@@ -543,10 +548,14 @@ def plot(data:dict=None,
 		zscale_graph.set_yticks([i for i in range(len(scales))],labels=scales[::-1],font='monospace')
 
 		## Setup X-Axis
-		labels = [f"{val_x+1: >{len(str(len(res_nums)))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
-		zscale_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
-		# Set major tick for each residue [0 to pos-1]
-		zscale_graph.xaxis.set_ticks([i for i in res_nums])
+		# TODO FIX LABELS
+		zscale_graph.xaxis.set_ticks(range(len(res_nums)))
+		labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
+		print(labels)
+		print(range(len(res_nums)))
+		# zscale_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
+		# res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
+		# zscale_graph.xaxis.set_minor_locator(MultipleLocator(1))
 		
 		# Set and rotate major tick labels
 		zscale_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
@@ -577,9 +586,12 @@ def plot(data:dict=None,
 	# # ## SAVING FILES
 	# # ###################################################################################################################
 
+	fig.canvas.draw_idle()
 	fig.set_size_inches(width,10)
-	plt.tight_layout()
+	fig.tight_layout()
+	# plt.tight_layout()
 	plt.savefig(fname_out,dpi=500)
+	fig.savefig("your_combined_plot.png")
 	
 	return fig
 
