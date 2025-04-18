@@ -12,6 +12,17 @@ import matplotlib.colors as mcolors
 from matplotlib import pyplot as plt
 import matplotlib.patches as patches
 from matplotlib.ticker import MultipleLocator
+from argparse import ArgumentParser, ArgumentTypeError
+
+
+def parse_range(s):
+    try:
+        start, end = map(int, s.split('-'))
+        if start > end:
+            raise ArgumentTypeError("Start of range must not be greater than end.")
+        return (start, end)
+    except ValueError:
+        raise ArgumentTypeError("Range must be in format 'start-end' with integers.")
 
 
 def __read_configuration_file(config_file:str=None) -> dict:
@@ -48,7 +59,7 @@ def __read_average_entropy_file(average_SE_file:str=None,msa_links:dict=None,dat
 				average_SEs[msa_links[res_num]] = float(average)
 				data[msa_links[res_num]]["ASE"] = float(average)
 
-	return average_SEs, data
+	return data
 
 def __read_consensus_file(consensus_file:str=None,data:dict=None,msa_links:dict=None) -> list:
 
@@ -108,6 +119,7 @@ def __read_res_highlight_subset_file(file:str=None) -> dict:
 
 	return selection
 
+
 def __read_SE_data(SE_file:str=None) -> list:
 
 	if not exists(SE_file):
@@ -161,15 +173,14 @@ def read_data(SE_file:str=None,
 			  consensus_file:str=None,
 			  highlight_file:str=None,
 			  average_SE_file:str=None,
-			  subset_file:str=None,
+			  subset:str=None,
 			  zscale_file:str=None):
 		
 	# Read in Shannon Entropy
 	data,msa_links = __read_SE_data(SE_file=SE_file)
 
 	# Read in Average Shannon Entropy
-	# TODO Remove ase_values from data
-	ase_values, data = __read_average_entropy_file(average_SE_file=average_SE_file,msa_links=msa_links,data=data)
+	data = __read_average_entropy_file(average_SE_file=average_SE_file,msa_links=msa_links,data=data)
 
 	# Read in Consensus Sequence
 	data = __read_consensus_file(consensus_file=consensus_file,data=data,msa_links=msa_links)
@@ -178,22 +189,18 @@ def read_data(SE_file:str=None,
 	highlights = __read_res_highlight_subset_file(file=highlight_file)
 
 	# Read in Z-Scale data
-	zscales = __read_zscale_data(zscale_file=zscale_file,data=data,msa_links=msa_links)
+	data = __read_zscale_data(zscale_file=zscale_file,data=data,msa_links=msa_links)
 	
 	# Read subset file and filter data to only include subset residues
-	subset = __read_res_highlight_subset_file(file=subset_file)
-	if subset_file is not None:
-		subset_pos = set(v for v in subset.values() for v in v)
-		subset_indices = np.array(sorted(subset_pos), dtype=int)
+	if subset is not None:
+		subset_pos = [i for i in range(subset[0]-1,subset[1]-1)]
 		data = {key: value for key, value in data.items() if key in subset_pos}
-		# ase_values = ase_values[subset_indices]
-
-	return data, ase_values, highlights
+	
+	return data, highlights
 	
 
 def plot(data:dict=None,
 		 highlights:dict=None,
-		 ase_values:np.array=None,
 		 config_file=None,
 		 fname_out=None) -> None:
 
@@ -218,12 +225,10 @@ def plot(data:dict=None,
 	font_size = 6
 	# Width of the graphic as to not have labels overlapping each other
 	width = font_size*(1/72)*(len_of_seq)*1.5
-	
+
 	####################################################################################################################
 	## Setting up graphics
 	####################################################################################################################
-
-	fig = plt.figure()
 
 	# Determine the number of rows and columns for the plot from the configuration file
 	plot_columns = 1
@@ -235,7 +240,9 @@ def plot(data:dict=None,
 	# Add 2 rows if residue_presence_matrix is enabled
 	if config["residue_presence_matrix"]:
 		plot_rows += 2
-	
+
+	fig = plt.figure(figsize=(width,plot_rows*2))
+
 	current_row = 0
 	final_plot = None
 	first_plot = None
@@ -255,7 +262,6 @@ def plot(data:dict=None,
 			first_plot = scs_graph
 		current_row += 1
 		final_plot = scs_graph
-	# Residue presense matrix 2nd, spans 2 rows
 	if config["residue_presence_matrix"]:
 		res_mat_graph = plt.subplot2grid((plot_rows,plot_columns),(current_row,0),rowspan=2)
 		if current_row == 0:
@@ -346,7 +352,6 @@ def plot(data:dict=None,
 		se_graph.spines['bottom'].set_visible(False)
 
 		# ase_graph = se_graph.twinx()
-		# se_graph.plot(res_nums,[ase_values[x] for x in res_nums],linewidth=0.5,color='b')
 
 	# ####################################################################################################################
 	# ## Specificity/Conservation Scoring
@@ -428,10 +433,10 @@ def plot(data:dict=None,
 		# res_mat_graph.xaxis.set_ticks([i-1 for i in range(len(res_nums)+1)])
 		res_mat_graph.xaxis.set_ticks(range(len(res_nums)))
 		# Set and rotate major tick labels
-		if res_mat_graph == first_plot:
-			labels = [None for val_x in res_nums]
-		else:
-			labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
+		# if res_mat_graph == first_plot:
+		# 	labels = [None for val_x in res_nums]
+		# else:
+		# 	labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
 		res_mat_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
 		# Show major tick labels, but not the ticks themselves, and only on the top
 		res_mat_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=True,labelbottom=False)
@@ -548,11 +553,10 @@ def plot(data:dict=None,
 		zscale_graph.set_yticks([i for i in range(len(scales))],labels=scales[::-1],font='monospace')
 
 		## Setup X-Axis
-		# TODO FIX LABELS
 		zscale_graph.xaxis.set_ticks(range(len(res_nums)))
 		labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
-		print(labels)
-		print(range(len(res_nums)))
+		# print(labels)
+		# print(range(len(res_nums)))
 		# zscale_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
 		# res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
 		# zscale_graph.xaxis.set_minor_locator(MultipleLocator(1))
@@ -570,13 +574,13 @@ def plot(data:dict=None,
 	## Setup top and bottom X-Axis
 	# first_plot.set_xticks([])
 	axt = first_plot.secondary_xaxis('top')
-	axt.set_xticks(res_nums)
+	axt.set_xticks(range(len(res_nums)))
 	axt.tick_params(which='both',top=False)
 	labels = [f"{data[x]['RES']} [{x+1}]" if x%2 != 0 else f"{data[x]['RES']}" for x in res_nums]
 	axt.set_xticklabels(labels,font='monospace',fontsize=font_size,ha='center',va='bottom',rotation='vertical')
 
 	rdg_bt = final_plot.secondary_xaxis("bottom")
-	rdg_bt.set_xticks([i for i in res_nums])
+	rdg_bt.set_xticks(range(len(res_nums)))
 	rdg_bt.tick_params(which='both',bottom=False)
 	# labels = [f"[{x+1}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
 	labels = [f"[{x+1}] {data[x]['CON_RES']}" if x%2 != 0 else data[x]['CON_RES'] for x in res_nums]
@@ -587,11 +591,8 @@ def plot(data:dict=None,
 	# # ###################################################################################################################
 
 	fig.canvas.draw_idle()
-	fig.set_size_inches(width,10)
-	fig.tight_layout()
-	# plt.tight_layout()
-	plt.savefig(fname_out,dpi=500)
-	fig.savefig("your_combined_plot.png")
+	plt.tight_layout()
+	plt.savefig(fname_out)
 	
 	return fig
 
@@ -600,23 +601,21 @@ def run(args=None) -> None:
 	ref = args.shannon_entropy_file.split("/")[-1].split(".")[0]
 	makedirs(args.outdir,mode=0o755,exist_ok=True)
 
-	data, ase_values, highlights = read_data(SE_file=args.shannon_entropy_file,
-										     consensus_file=args.consensus_sequence_file,
-											 highlight_file=args.highlight_residues,
-											 average_SE_file=args.average_entropy_file,
-											 subset_file=args.subset_file,
-											 zscale_file=args.zscale_file)
+	data, highlights = read_data(SE_file=args.shannon_entropy_file,
+							  consensus_file=args.consensus_sequence_file,
+							  highlight_file=args.highlight_residues,
+							  average_SE_file=args.average_entropy_file,
+							  subset=args.subset,
+							  zscale_file=args.zscale_file)
+	
 	plot(data=data,
 	     highlights=highlights,
-		 ase_values=ase_values,
 		 config_file=args.configuration,
 		 fname_out=f"{args.outdir}/{ref}.png")
 	
 	return None
 
 if __name__ == "__main__":
-
-	from argparse import ArgumentParser
 
 	GetOptions = ArgumentParser()
 
@@ -626,7 +625,7 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-c","--consensus_sequence_file",required=False,type=str)
 	GetOptions.add_argument("-a","--average_entropy_file",required=False)
 	GetOptions.add_argument("-z","--zscale_file",required=False,type=str)
-	GetOptions.add_argument("-f","--subset_file",required=False,type=str)
+	GetOptions.add_argument("-f","--subset",required=False,type=parse_range,help="Select subset of residues to plot, like 1-100")
 	GetOptions.add_argument("-l","--configuration",required=False,type=str)
 
 	run(args=GetOptions.parse_known_args()[0])
