@@ -6,10 +6,13 @@ from math import log
 from statistics import median
 import argparse
 import numpy as np
+from numpy.typing import NDArray
 import pandas as pd
 from os import makedirs
 from os.path import exists
 from time import time
+from convert_alignment import read_MSA
+from typing import Tuple
 
 multiprocessing = None
 if 'linux' or 'win' in sys.platform: multiprocessing = 'multiprocessing'
@@ -17,19 +20,25 @@ elif 'darwin' in sys.platform: multiprocessing = 'multiprocess'
 elif 'win' in sys.platform: multiprocessing = 'multiprocessing'
 mp = __import__(multiprocessing)
 
-def get_reference_indexs(ref:str,msas:pd.DataFrame) -> list:
+# def give_me_time(secs:float) -> str:
 
-	if ref not in msas.index:
-		print(f"\n\t[W] Reference {ref} is not found in the provided MSA. Skipping to prevent errors\n\n")
-		return 1
+# 	days,seconds = divmod(secs,60*60*24)
+# 	hours,seconds = divmod(seconds,60*60)
+# 	minutes,seconds = divmod(seconds,60)
 
-	indexs = []
-	for index,item in enumerate(msas.loc[ref]):
-		if item == '-':
-			continue
-		indexs.append(index)
+# 	if branch_point%10 == 0:
+# 		print(f"\t[{branch_point: >{buffer}d}/{total_branch_points}]  Processed 10 branches in {give_me_time(time()-branch_start)}")
+# 		print(f"\t\tElapsed Time: {give_me_time(time()-total_start)}")
+# 		print(f"\t\tAverage Time Per Branch: {give_me_time(median(times))}")
+# 		print(f"\t\tMaximum Branch Time: {give_me_time(max_time)}")
+# 		print(f"\t\tMinimum Branch Time: {give_me_time(min_time)}")
+# 		print(f"\t\tETA to completion: {give_me_time(median(times)*(total_branch_points-branch_point))}")
+# 		branch_start = time()
 
-	return indexs
+# 	return f"{int(days)}d {int(hours)}h {int(minutes)}m {int(seconds)}s"
+
+global AAs
+AAs = ['A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y','X','Z','-']
 
 def load_msa(msa_file:str) -> pd.DataFrame:
 
@@ -37,46 +46,37 @@ def load_msa(msa_file:str) -> pd.DataFrame:
 	Read in and store MSA, checking whether length is same for all sequences present
 	"""
 
-	msas = {}
+	print(f"\n\t\tReading alignment data from MSA file {msa_file}")
 
-	## Cheap and dirty way to check if all MSA sizes are the same
-	size_range = [float('inf'),float('-inf')]
-	locus = None
-	with open(msa_file,'r') as IN:
+	start = time()
+	_,msa = read_MSA(msa_file=msa_file)
 
-		for line in IN:
-			
-			## Remove trailing spaces and new line characters
-			line = line.strip()
+	print(f"\n\t\t\tAlignment data loaded in {time()-start:.0f}s")
 
-			if line == '':
-				continue
-		
-			## Grab Protein_ID
-			if line[0] == ">":
+	msa_keys = msa.keys()
 
-				locus = line[1:]
+	msa = {x:[i for i in msa[x]] for x in msa_keys}
 
-				## Notify of duplicated Protein_ID
-				if locus in msas.keys():
-				
-					print(f"\n\n\t[W]  Locus {locus} has been duplicated in the MSA\n")
+	len_max = max([len(msa[x]) for x in msa_keys])
+	len_min = min([len(msa[x]) for x in msa_keys])
 
-				continue
-
-			## Store the MSA string
-			msas[locus] = list(line)
-
-			size_range[0] = len(line) if len(line) < size_range[0] else size_range[0]
-			size_range[1] = len(line) if len(line) > size_range[1] else size_range[1]
-
-	if size_range[0] != size_range[1]:
-		print(f"\n\n\t[E]  Sequences do not have the same length!\n\t\tMin Len: {size_range[0]}\n\t\tMax Len: {size_range[1]}")
+	if len_min != len_max:
+		print(f"\n\t[E]  Aligned sequences do not have the same length (min/max: {len_min}/{len_max}).")
+		print(f"\n\t[N]  Terminating Two-Entropy calculations.")
 		exit()
 
-	msas = pd.DataFrame().from_dict(msas,orient='index')
+	pause = time()
+	print(f"\n\t\tProcessing alignment data")
 
-	return msas
+	arrayed_MSA = pd.DataFrame({'array':np.array(np.zeros((len(AAs),len_max)) for key in msa_keys)},dtype=object,index=msa_keys)#,columns=[x for x in msa_keys])
+
+	for key in msa_keys:
+		for index,res in enumerate(msa[key]):
+			arrayed_MSA.loc[key,'array'][AAs.index(res)][index] = 1
+
+	print(f"\n\t\t\tAlignment data prcocessed in {time()-pause:.0f}s")
+
+	return arrayed_MSA
 
 def load_similarity_matrix(matrix:str) -> dict:
 
@@ -119,34 +119,16 @@ def load_similarity_matrix(matrix:str) -> dict:
 
 		return sim_mat
 
-def process_colummns(msa:pd.DataFrame) -> dict:
+def process_colummns(msa:pd.DataFrame) -> np.ndarray:
 
-	msas_residues = {}
-
-	_, n_res = msa.shape
-
-	col_data = [msa[x] for x in range(n_res)]
-
-	for res_num,col in enumerate(col_data):
-
-		## Convert column information to array
-		residues = col.to_numpy()
-
-		## Get the residue counts
-		unique,counts = np.unique(residues,return_counts=True)
-
-		residue_counts = dict(zip(unique,counts))
-		msas_residues[res_num] = residue_counts
-
-	return msas_residues
-
-def max_shannon_entropy(num_of_seqs:int) -> float:
-
-	res_prob = (1/num_of_seqs)
-
-	max_sh_entropy = (num_of_seqs * (res_prob * (log(res_prob, 2))))
-
-	return max_sh_entropy
+	"""Returns the counts of all unique residues present in all sequences at the i-th index, for all index in the MSA.
+	 
+	### Input:
+	**msa**: _Pandas.DataFrame_
+	<br>Multiple-Sequence Alignment where each row is the j-th aligned protein sequence and each column is the i-th residue of the alignment.
+	"""
+	
+	return np.sum(msa.loc[msa.index,'array'],axis=0)
 
 def calc_shannon_entropy(res_count:dict) -> float:
 
@@ -174,57 +156,11 @@ def calc_shannon_entropy(res_count:dict) -> float:
 
 	return entropy
 
-def shannon_entropy(msa:pd.DataFrame) -> dict:
-
-	n_seq, n_res = msa.shape
-
-	res_counts = process_colummns(msa)
-
-	results = {}
-	for res_num in res_counts.keys():
-		entropy = calc_shannon_entropy(res_count=res_counts[res_num])
-		num_of_gaps = 0 if '-' not in res_counts[res_num].keys() else res_counts[res_num]['-']
-		num_of_non_gaps = n_seq - num_of_gaps
-		results[res_num] = [entropy,num_of_non_gaps,num_of_gaps,res_counts[res_num]]
-
-	return results
-
-def calc_average_entropy(msas:pd.DataFrame) -> list:
-
-	N_j,n_res = msas.shape
-
-	if N_j == 1:
-		test = np.zeros(n_res)
-		return test
-
-	res_counts = process_colummns(msa=msas)
-	AAs = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
-	A_j = np.array([[res_counts[res_num][res] if res in res_counts[res_num].keys() else 0 for res in AAs] for res_num in sorted(res_counts.keys())])
-	G_j = np.array([res_counts[res_num]['-'] if '-' in res_counts[res_num].keys() else 0 for res_num in sorted(res_counts.keys())])
-	W_j = 1/log(N_j) if N_j < 20 else 1/log(20)
-
-	n_j = 1/N_j
-
-	a_j = A_j*n_j
-	a_j[a_j == 0] = 1
+def calc_summed_entropy(branchpoint:dict) -> list:
 	
-	# print(f"N_j value: {N_j}")
-	# print(f"a_j values: {a_j[0]}")
-	# print(f"G_j values: {G_j[0]}")
-	# print(f"n_j value: {n_j}")
-	# print(f"W_j value: {W_j}")
+	N_j,n_res = g_msa.shape
 
-	# print(f"Sum(a_j*ln(a_j): {(-np.sum(((a_j*n_j)*np.log(a_j*n_j))))}")
-	# print(f"G_j*n_j*ln(n_j): {(-G_j*n_j*np.log(n_j))[0]}")
-	# print(W_j*((-np.sum(((a_j)*np.log(a_j)),axis=1))-(G_j*n_j*np.log(n_j)))[0])
-
-	return W_j*((-np.sum(((a_j)*np.log(a_j)),axis=1))-(G_j*n_j*np.log(n_j)))
-
-def calc_summed_entropy(msas:pd.DataFrame) -> list:
-	
-	N_j,n_res = msas.shape
-
-	res_counts = process_colummns(msa=msas)
+	res_counts = process_colummns(msa=msa)
 	AAs = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
 	F_ia = {}
 	E_i = []
@@ -241,48 +177,66 @@ def calc_summed_entropy(msas:pd.DataFrame) -> list:
 		E_i.append(entropy)
 	return E_i
 
+def get_reference_indexs(ref:str,msa:pd.DataFrame) -> list:
 
-def run(args:dict) -> None:
+	if ref not in msa.index:
+		print(f"\n\t[W] Reference {ref} is not found in the provided MSA. Skipping to prevent errors\n\n")
+		return None
 
-	total_start = time()
+	indexes = []
+	for index,item in enumerate(msa.loc[ref]):
+		if item == '-':
+			continue
+		indexes.append(index)
 
-	path_msa = args.msapath
-	path_subfamilies = args.subfamilypath
-	outpath = args.outpath
-	reference_ids = args.reference_ids
-	threads = args.threads
-	mode= args.program_mode
-	# sim_mat = args.similarity_matrix
+	return indexes
 
-	# Default settings
-	shannon_entropy_file = "shannon_entropy.txt"
-	tea_shannon_entropy_file = "tea_average_shannon_entropy.txt"
-	teao_shannon_entropy_file = "teao_average_shannon_entropy.txt"
-	logo_file = "consensus_logo.txt"
+def shannon_entropy(msa:pd.DataFrame) -> dict:
 
-	makedirs(outpath,mode=0o755,exist_ok=True)
+	n_seq, n_res = msa.shape
 
-	# Load and make sure all sequences in the MSA have the same length before starting calculations
-	msas = load_msa(path_msa)
+	res_counts = process_colummns(msa)
 
-	n_seq, n_res = msas.shape
-	msa_buffer = len(str(n_res))
-	max_sh_entropy = max_shannon_entropy(n_seq)
+	results = {}
+	for res_num in res_counts.keys():
+		entropy = calc_shannon_entropy(res_count=res_counts[res_num])
+		num_of_gaps = 0 if '-' not in res_counts[res_num].keys() else res_counts[res_num]['-']
+		num_of_non_gaps = n_seq - num_of_gaps
+		results[res_num] = [entropy,num_of_non_gaps,num_of_gaps,res_counts[res_num]]
 
-	start = time()
-	results = shannon_entropy(msa=msas)
+	return results
+
+def write_shannon_entropy(results:dict,msa_buffer:int,outfile:str) -> None:
+
 	min_entropy = min([x[0] for x in results.values()])
 	max_entropy = max([x[0] for x in results.values()])
 
-	print(f"Global SE calculated for {n_seq} (nres = {n_res}) in {(time()-start):.2f}s")
-
-	with open(f"{outpath}/{shannon_entropy_file}",'w') as OUT:
+	with open(outfile,'w') as OUT:
 		OUT.write(f"## MSA_position\tShannon_Entropy\tFract_Shannon_Entropy\tSequences_at_pos\tNum_of_gaps\n")
 		for res_num in sorted(results.keys()):
+			
 			sh_entropy,non_gapped_res,num_of_gaps,_ = results[res_num]
-			OUT.write(f"{res_num: >{msa_buffer}d}\t{sh_entropy: >.2f}\t{1-((sh_entropy-(min_entropy))/(max_entropy-(min_entropy))): >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps}\n")
+			
+			## MSA Position
+			OUT.write(f"{res_num: >{msa_buffer}d}")
 
-	with open(f"{outpath}/{logo_file}",'w') as OUT:
+			## Shannon Entropy
+			OUT.write(f"\t{sh_entropy: >.2f}")
+
+			## Fraction Shannon Entropy
+			OUT.write(f"\t{1-((sh_entropy-(min_entropy))/(max_entropy-(min_entropy))): >3.2f}")
+
+			## Sequences at position
+			OUT.write(f"\t{non_gapped_res: >{msa_buffer}}")
+
+			## Number of gaps
+			OUT.write(f"\t{num_of_gaps}\n")
+
+	return None
+
+def write_logo(results:dict,msa_buffer:int,outfile:str) -> None:
+
+	with open(outfile,'w') as OUT:
 		OUT.write(f"## MSA_position\tRes:Count;\n")
 		for res_num in (sorted(results.keys())):
 			_,_,_,residue_counts = results[res_num]
@@ -292,156 +246,233 @@ def run(args:dict) -> None:
 				OUT.write(f";{residue}:{residue_counts[residue]}")
 			OUT.write("\n")
 
-	for reference in reference_ids:
-		indexs = get_reference_indexs(reference,msas)
-		res_buffer = len(str(len(indexs)))
-		with open(f"{outpath}/{reference}.shannon_entropy.txt",'w') as OUT:
-			OUT.write(f"## Sequence_Pos\tMSA_Pos\tResidue\tShannon_Entropy\tFract_Shannon_Entropy\tSequences_at_pos\tNum_of_gaps\n")
-			for res_index,msa_index in enumerate(indexs):
-				sh_entropy,non_gapped_res,num_of_gaps,_ = results[msa_index]
-				OUT.write(f"{res_index: <{res_buffer}d}\t{msa_index: >{msa_buffer}d}\t{msas.loc[reference][msa_index]}\t{sh_entropy: >.2f}\t{(1-(sh_entropy-(min_entropy))/(max_entropy-(min_entropy))): >3.2f}\t{non_gapped_res: >{msa_buffer}}\t{num_of_gaps: >{msa_buffer}}\n")
+	return None
 
-	if path_subfamilies and exists(path_subfamilies) and (mode == "TEAO"):
+def write_references(reference_id:str,msa:pd.DataFrame,results:dict,outdir:str,msa_buffer:int) -> None:
 
-		print("Starting subfamily entropy calculations...")
+	min_entropy = min([x[0] for x in results.values()])
+	max_entropy = max([x[0] for x in results.values()])
 
-		def give_me_time(secs:float) -> str:
+	res_buffer = len(str(msa.shape[1]))
+	outfile = f"{outdir}/{reference_id}.shannon_entropy.txt"
 
-			days,seconds = divmod(secs,60*60*24)
-			hours,seconds = divmod(seconds,60*60)
-			minutes,seconds = divmod(seconds,60)
+	reference_seq_to_msa_indexes = get_reference_indexs(ref=reference_id,msa=msa)
 
-			return f"{int(days)}d {int(hours)}h {int(minutes)}m {int(seconds)}s"
+	with open(outfile,'w') as OUT:
+		OUT.write(f"## Sequence_Pos\tMSA_Pos\tResidue\tShannon_Entropy\tFract_Shannon_Entropy\tSequences_at_pos\tNum_of_gaps\n")
+		res_index = 0
+		for res_index,msa_index in enumerate(reference_seq_to_msa_indexes):
+			sh_entropy,non_gapped_res,num_of_gaps,_ = results[msa_index]
+			OUT.write(f"{res_index: <{res_buffer}d}")
+			OUT.write(f"\t{msa_index: >{msa_buffer}d}")
+			OUT.write(f"\t{msa.loc[reference_id][msa_index]}")
+			OUT.write(f"\t{sh_entropy: >.2f}")
+			OUT.write(f"\t{(1-(sh_entropy-(min_entropy))/(max_entropy-(min_entropy))): >3.2f}")
+			OUT.write(f"\t{non_gapped_res: >{msa_buffer}}")
+			OUT.write(f"\t{num_of_gaps: >{msa_buffer}}\n")
+			res_index += 1
 
-		print()
+	return None
 
-		total_branch_points = 0
-		with open(path_subfamilies,'r') as IN:
-			total_branch_points = sum(1 for line in IN if line[0] != '#')
+def read_subfamilies(subfamilies_file:str) -> dict:
 
-		previous_branch_points = 0
-		SEs = np.zeros((total_branch_points,n_res))
-		temp_file = f"{outpath}/.subfamily_entropies"
-		if exists(temp_file):
-			with open(temp_file,'r') as TEMP:
-				for line_count,line in enumerate(TEMP):
-					if line_count < total_branch_points - 1:
-						SEs[line_count] = np.fromstring(line,dtype=float,sep=';')
-						previous_branch_points += 1
+	"""
+	Reads subfamily file created by upgma_subfam_grouping.py
 
-		TEMP = open(f"{outpath}/.subfamily_entropies",'w')
+	#### Input
+	*str* Filepath to subfamilies file
 
-		with open(path_subfamilies,'r') as IN:
 
-			indexes = []
+	#### Returns
+	*dict* A hash of hashes containing all subfamilies for all branchpoints.
+	The first set of keys are the branchpoints and the second is the group numbers for the subfamilies.
+	The stored values are all the accessions for the corresponding group at the corresponding
+	branchpoint.
+	"""
 
-			branch_point = -1
-			branch_start = time()
-			times = []
-			max_time = np.NINF
-			min_time = np.PINF
-			for line in IN:
-				line = line.strip()
-				
-				if line == "":
-					continue
-				if line[0] == "#":
-					indexes = line.split()[-1].split(';')
-					continue
+	## Load in subfamily information; headers being keys and values being the subfamily it belongs to
+	subfamilies = pd.read_csv(subfamilies_file,header=0,index_col=None,sep=';')
 
-				branch_point += 1
+	families = {}
+
+	## Each line represents a branch point; several sequences can be joined at the same branch point
+	for index,branch in subfamilies.iterrows():
+
+		families[index] = {}
+
+		## Iterate over all sequences IDs, assigning them to their group numbers
+		for key,value in branch.to_dict().items():
+
+			## Initialize subfamliy at the current index
+			if value not in families[index].keys():
+
+				families[index][value] = []
+
+			## Add the sequence ID to the proper subfamily
+			families[index][value].append(key)
+
+	return families
+
+def calc_average_entropy(index,groupings) -> Tuple[int,NDArray]:
+
+	"""Returns the average entropy of all i-th positions within an MSA according to Ye's subfamily weighted averaging.
+
+	### Input:
+		**groupings_data**: _tuple_ (branch_index,subfamily_groupings)
+		Subfamily groupings, where a key represents the family ID and the value is an array of sequence IDs from the MSA.
+	"""
+
+	_,num_of_MSA_res = g_msa.loc[g_msa.index[0],'array'].shape
+
+	E_i = np.zeros((1,num_of_MSA_res))
+
+	start = time()
+
+	print(f"\n\t\tStarting calculations for Branch {index}. Averaging across {len(groupings.keys())} subfamilies")
+
+	for subfamily_group_number in groupings.keys():
+
+		## Number of proteins in the subfamily
+		n_j:int = len(groupings[subfamily_group_number])
+
+		## A subfamily with a single sequence does not provide information on the Two-Entropy approach
+		if n_j == 1:
+			continue
+
+		## Occurrences of residues at position of i
+		res_i:dict = process_colummns(msa=g_msa.loc[groupings[subfamily_group_number]])
+
+		## Occurrences of AA at position i in the subfamily, minus gaps, normalized by number of proteins in subfamily
+		## Array is of size number_of_residues x 20 (number of amino acids)
+		a_i:np.array = res_i[0:-1]/n_j
+
+		## ln(0) ==> bad things... instead make ln(1) ==> 0 as 0 won't effect the output
+		a_i[a_i==0] = 1
+
+		## Number of gaps at position in the subfamily
+		G_i:np.array = res_i[-1]
+
+		G_i = G_i.reshape(1,num_of_MSA_res)
+
+		## Normalization factor
+		W_j:float = 1/np.log(n_j) if n_j < 20 else 1/np.log(20)
+
+		## Add weighted subfamily entropy to total entropy
+		E_i += W_j*((-np.sum(a_i*np.log(a_i),axis=0)).reshape(1,num_of_MSA_res)-G_i*(1/n_j)*np.log(1/n_j))
+
+	print(f"\n\t\tFinished processing Branch {index} in {time()-start:.0f}s")
+
+	## Return residue-wise entropy normalized by number of subgroups
+	return index,E_i/len(groupings.keys())
+
+def TEAO(subfamilies_file:str,outdir:str,msa:pd.DataFrame,threads:int) -> None:
+
+	## Make the MSA globally accessible
+	global g_msa
+	g_msa = msa
+
+	if not exists(subfamilies_file):
+
+		return None
+
+	print("\n\tStarting subfamily entropy calculations...")
+
+	num_of_seqs,num_of_MSA_res = msa.loc[g_msa.index[0],'array'].shape
+
+	msa_buffer = len(str(num_of_seqs))
+
+	subfamilies:dict = read_subfamilies(subfamilies_file)
+
+	keys = [x for x in subfamilies.keys()]
+
+	results = []
 	
-				families = {}
-				for index,family in enumerate(line.split(";")):
-					if family not in families.keys():
-						families[family] = []
+	for key in keys:
+		results.append(calc_average_entropy(key,subfamilies[key]))
 
-					families[family].append(indexes[index])
+	buffer = len(str(len(keys)))
 
-				## Iterate over each subfamily
-				start = time()
-				m = len(families.keys())
+	se = np.zeros((1,num_of_MSA_res))
+	for index,result in sorted(results,key=lambda x: x[0]):
+		se += result
+	se /= len(results)
 
-				if branch_point < previous_branch_points:
-					TEMP.write(f"{';'.join(map(str, SEs[branch_point]))}\n")
-					continue
+	with open(f"{outdir}/teao_average_shannon_entropy.txt",'w') as OUT:
+		for msa_pos,se in enumerate(se[0]):
+			OUT.write(f"{msa_pos: <{msa_buffer}}\t{se:.4f}\n")
 
-				results = []
-				with mp.Pool(threads) as executor:
-					results = executor.map(calc_average_entropy,[msas.loc[family] for family in families.values()])
-				results = np.array(results)
-				E_i = np.divide(np.sum(results,axis=0),m)
+	return None
 
-				buffer = len(str(total_branch_points))
+def run(path_msa:str,subfamilies_file:str,outdir:str,reference_id:str,threads:int,mode:str) -> None:
 
-				if len(times) == 100:
-					times.pop(0)
-					times.append(time()-start)
-				else:
-					times.append(time()-start)
+	total_start = time()
 
-				max_time = times[-1] if times[-1] > max_time else max_time
-				min_time = times[-1] if times[-1] < min_time else min_time
+	print(f"\n\tTwo Entropy Analysis started")
 
-				TEMP.write(f"{(';'.join(map(str,E_i)))}\n")
+	# Default settings
+	shannon_entropy_file = "shannon_entropy.txt"
+	tea_shannon_entropy_file = "tea_average_shannon_entropy.txt"
+	logo_file = "consensus_logo.txt"
 
-				SEs[branch_point] = E_i
-				
-				if branch_point%10 == 0:
-					print(f"\t[{branch_point: >{buffer}d}/{total_branch_points}]  Processed 10 branches in {give_me_time(time()-branch_start)}")
-					print(f"\t\tElapsed Time: {give_me_time(time()-total_start)}")
-					print(f"\t\tAverage Time Per Branch: {give_me_time(median(times))}")
-					print(f"\t\tMaximum Branch Time: {give_me_time(max_time)}")
-					print(f"\t\tMinimum Branch Time: {give_me_time(min_time)}")
-					print(f"\t\tETA to completion: {give_me_time(median(times)*(total_branch_points-branch_point))}")
-					branch_start = time()
+	makedirs(outdir,mode=0o755,exist_ok=True)
 
-		SEs = np.divide(np.sum(SEs,axis=0),total_branch_points)
-		SEs_norm = (SEs - np.min(SEs)) / (np.max(SEs) - np.min(SEs))
+	msa = load_msa(path_msa)
+
+	n_seq, n_res = msa.shape
+
+	msa_buffer = len(str(n_res))
+
+	start = time()
+	# results = shannon_entropy(msa=msa)
+
+	# print(f"Global SE calculated for {n_seq} (nres = {n_res}) in {(time()-start):.2f}s")
+
+	# write_shannon_entropy(results=results,msa_buffer=msa_buffer,outfile=f"{outdir}/{shannon_entropy_file}")
+	
+	# write_logo(results=results,msa_buffer=msa_buffer,outfile=f"{outdir}/{logo_file}")
+
+	# write_references(reference_id=reference_id,msa=msa,results=results,outdir=outdir,msa_buffer=msa_buffer)
 
 
-		with open(f"{outpath}/{teao_shannon_entropy_file}",'w') as OUT:
-			for msa_pos,se in enumerate(SEs_norm):
-				OUT.write(f"{msa_pos: <{msa_buffer}}\t{se:.2f}\n")
+	print("\n\tRunning TEA-O...")
+	TEAO(subfamilies_file=subfamilies_file,outdir=outdir,msa=msa,threads=threads)
 
-		print(f"\nTask completed after a total runtime of {give_me_time(time()-total_start)}\n")
+	# if subfamilies_file and exists(subfamilies_file) and (mode == "TEA"):
 
-	elif path_subfamilies and exists(path_subfamilies) and (mode == "TEA"):
+	# 	with open(subfamilies_file,'r') as IN:
 
-		with open(path_subfamilies,'r') as IN:
+	# 				indexes = []
 
-					indexes = []
-
-					for line in IN:
-						line = line.strip()
+	# 				for line in IN:
+	# 					line = line.strip()
 						
-						if line == "":
-							continue
-						if line[0] == "#":
-							indexes = line.split()[-1].split(';')
-							continue
+	# 					if line == "":
+	# 						continue
+	# 					if line[0] == "#":
+	# 						indexes = line.split()[-1].split(';')
+	# 						continue
 						
-						families = {}
-						for index,family in enumerate(line.split(";")):
-							if family not in families.keys():
-								families[family] = []
+	# 					families = {}
+	# 					for index,family in enumerate(line.split(";")):
+	# 						if family not in families.keys():
+	# 							families[family] = []
 
-							families[family].append(indexes[index])
+	# 						families[family].append(indexes[index])
 						
-						## Iterate over each subfamily
-						m = len(families.keys())
+	# 					## Iterate over each subfamily
+	# 					m = len(families.keys())
 						
-						results = []
-						with mp.Pool(threads) as executor:
-							results = executor.map(calc_summed_entropy,[msas.loc[family] for family in families.values()])
-						results = np.array(results)
-						E_i = np.divide(np.sum(results,axis=0),m)
-						E_i_norm = (E_i - np.min(E_i)) / (np.max(E_i) - np.min(E_i))
+	# 					results = []
+	# 					with mp.Pool(threads) as executor:
+	# 						results = executor.map(calc_summed_entropy,[msa.loc[family] for family in families.values()])
+	# 					results = np.array(results)
+	# 					E_i = np.divide(np.sum(results,axis=0),m)
+	# 					E_i_norm = (E_i - np.min(E_i)) / (np.max(E_i) - np.min(E_i))
 
 
-		with open(f"{outpath}/{tea_shannon_entropy_file}",'w') as OUT:
-			for msa_pos,se in enumerate(E_i_norm):
-				OUT.write(f"{msa_pos}\t{se:.2f}\n")
+		# with open(f"{outdir}/{tea_shannon_entropy_file}",'w') as OUT:
+		# 	for msa_pos,se in enumerate(E_i_norm):
+		# 		OUT.write(f"{msa_pos}\t{se:.2f}\n")
 
 	# load_similarity_matrix(matrix=sim_mat)
 
@@ -493,22 +524,18 @@ def run(args:dict) -> None:
 #     return score
 
 
-def main(args):
-
-	run(args)
-
 if __name__ == '__main__':
 
 	parser = argparse.ArgumentParser(description='')
 	parser.add_argument("-m", "--msapath", required=True, help="file location of Multiple Sequence Alignment (oneliner format)")
 	parser.add_argument("-s", "--subfamilypath", help="file location of subfamily assignment (TXT file)")
-	parser.add_argument("-o", "--outpath", required=True, help="output file location")
+	parser.add_argument("-o", "--outdir", required=True, help="output file location")
 	parser.add_argument("-p", "--program_mode", required=False, choices=['TEA', 'TEAO'], default="TEAO", help="run program in TEA or TEAO mode")
-	parser.add_argument("-r", "--reference_ids", required=False, help="reference ID(s).", nargs="+")
+	parser.add_argument("-r", "--reference_id", required=False, help="reference ID(s).")
 	# parser.add_argument("-i", "--seqidentity", help="Calculate pairwise sequence identity matrix", required=False, default=False)
 	parser.add_argument("-x", "--similarity_matrix", help="Calculate scores according to provided matrix", required=False, type=str,default=None)
 	# parser.add_argument("-j", "--json", type=str, help="store command line argument as json. Provide folder where to store", required=False)
 	parser.add_argument("-t","--threads",type=int,required=False,default=1)
 	args = parser.parse_args()
 
-	main(args)
+	run(path_msa=args.msapath,subfamilies_file=args.subfamilypath,outdir=args.outdir,reference_id=args.reference_id,threads=args.threads,mode=args.program_mode)
