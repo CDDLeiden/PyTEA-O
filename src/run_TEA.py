@@ -37,8 +37,6 @@ def run(args:ArgumentParser.parse_known_args) -> None:
 		threads=args.threads
 	)
 
-	exit()
-
 	print("\n\n\tIdentifying physiochemical patterns of residue positions.")
 	z_scales(
 		msa_file=args.msa_file,
