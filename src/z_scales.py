@@ -37,15 +37,15 @@ def reshape_df(df):
 			count += 1
 	return matrix
 
-def run(args=None):
+def run(msa_file:str,outdir:str="zscales",descriptors:str='Zscale Sandberg'):
 
 	zscales_file = 'zscales.txt'
 
 	# Create output directory
-	if not os.path.exists(args.outdir):
-		os.makedirs(args.outdir)
+	if not os.path.exists(outdir):
+		os.makedirs(outdir)
 	
-	msa = load_msa(args.msa_file)
+	msa = load_msa(msa_file)
 	positions = {i: row.tolist() for i, (_, row) in enumerate(msa.iterrows())}
 
 	# Calculate Z-scales
@@ -80,7 +80,7 @@ def run(args=None):
 	z_scales_scaled['MSA_position'] = msa_positions
 
 	# Save Zscales to file
-	with open(f"{args.outdir}/{zscales_file}",'w') as OUT:
+	with open(f"{outdir}/{zscales_file}",'w') as OUT:
 		OUT.write(f"## MSA_position\tZ1\tZ2\tZ3\tZ4\tZ5\n")
 		for _, row in z_scales_scaled.iterrows():
 			OUT.write(f"{int(row['MSA_position'])}\t{row['Z1']}\t{row['Z2']}\t{row['Z3']}\t{row['Z4']}\t{row['Z5']}\n")
@@ -96,4 +96,6 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-o","--outdir",required=False,type=str,default="zscales")
 	GetOptions.add_argument("-d","--descriptors",required=False,default='Zscale Sandberg')
 
-	run(GetOptions.parse_known_args()[0])
+	args = GetOptions.parse_known_args()[0]
+
+	run(msa_file=args.msa_file,outdir=args.outdir,descriptors=args.descriptors)
