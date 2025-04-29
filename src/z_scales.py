@@ -5,7 +5,7 @@ import sys
 import numpy as np
 import pandas as pd
 from prodec import ProteinDescriptors
-from shannon_entropy import load_msa
+from convert_alignment import read_MSA
 
 
 def calculate_protein_descriptor(aligned_sequences:list, descriptor:str) -> pd.DataFrame:
@@ -39,24 +39,19 @@ def reshape_df(df):
 
 def run(msa_file:str,outdir:str="zscales",descriptors:str='Zscale Sandberg'):
 
-	zscales_file = 'zscales.txt'
+
+	AAs = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
 
 	# Create output directory
 	if not os.path.exists(outdir):
 		os.makedirs(outdir)
 	
-	msa = load_msa(msa_file)
-	positions = {i: row.tolist() for i, (_, row) in enumerate(msa.iterrows())}
+	prefix,msa = read_MSA(msa_file)
+
+	sequences = ["".join([res if res.upper() in AAs else '-' for res in sequence]) for sequence in msa.values()]
 
 	# Calculate Z-scales
-	truncated_sequences = []
-	for _, v in positions.items():
-		truncated_sequences.append(''.join(v))
-
-	# Check for unknown amino acids
-	truncated_sequences = [''.join([aa if aa in 'ACDEFGHIKLMNPQRSTVWY' else '-' for aa in seq]) for seq in truncated_sequences]
-
-	z_scales = calculate_protein_descriptor(truncated_sequences, 'Zscale Sandberg')
+	z_scales = calculate_protein_descriptor(sequences, 'Zscale Sandberg')
 
 	# Replace the 0s (gaps) by NaN
 	z_scales.replace(0, np.nan, inplace=True)
@@ -75,12 +70,12 @@ def run(msa_file:str,outdir:str="zscales",descriptors:str='Zscale Sandberg'):
 									4: 'Z5'}, inplace=True)
 	
 	# Add msa positions to dataframe
-	msa_positions = [i for i in range(len(truncated_sequences[0]))]
+	msa_positions = [i for i,_ in enumerate(sequences[0])]
 	z_scales_scaled = z_scales_scaled.apply(pd.to_numeric, errors='coerce')
 	z_scales_scaled['MSA_position'] = msa_positions
 
 	# Save Zscales to file
-	with open(f"{outdir}/{zscales_file}",'w') as OUT:
+	with open(f"{outdir}/zscales.tsv",'w') as OUT:
 		OUT.write(f"## MSA_position\tZ1\tZ2\tZ3\tZ4\tZ5\n")
 		for _, row in z_scales_scaled.iterrows():
 			OUT.write(f"{int(row['MSA_position'])}\t{row['Z1']}\t{row['Z2']}\t{row['Z3']}\t{row['Z4']}\t{row['Z5']}\n")
