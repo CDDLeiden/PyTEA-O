@@ -10,6 +10,7 @@ from time import time
 from convert_alignment import read_MSA
 from warnings import simplefilter
 import gc
+from typing import Tuple
 
 simplefilter(action='ignore',category=pd.errors.PerformanceWarning)
 
@@ -61,9 +62,11 @@ def calculate_sequence_difference(msa:dict,outfile:str) -> pd.DataFrame:
 		pandas.Dataframe: NxN lower triangular matrix
 	"""
 
+	print(f"\n\tCalculating sequence distances")
+
 	if isfile(outfile):
 
-		print(f"\n\t\t[N] Loading previously calculated pairwise distances...\n")
+		print(f"\n\t\t[N] Loading previously calculated pairwise distances...")
 		return pd.read_csv(outfile,header=0,index_col=0)
 
 	distance_matrix = generate_distance_matrix(msa)
@@ -78,16 +81,16 @@ def calculate_sequence_difference(msa:dict,outfile:str) -> pd.DataFrame:
 	with mp.Pool(mp.cpu_count()) as executor:
 		results = executor.map(distance,keys)
 
-	print(f"\n\t\tDistance calculations took {int(time()-start)}s\n")
+	print(f"\n\t\tDistance calculations took {int(time()-start)}s")
 
 	pause = time()
 	item:int = 0
 	for sequence_loc_a,result in results:
 		item += 1
 		distance_matrix.loc[sequence_loc_a] = result
-	print(f"\n\t\tDistance assignment took {int(time()-pause)}s\n")
+	print(f"\n\t\tDistance assignment took {int(time()-pause)}s")
 
-	print(f"\n\t\tGenerated {len(keys)}x{len(keys)} distance matrix in {int(time()-start)}s\n")
+	print(f"\n\t\tGenerated {len(keys)}x{len(keys)} distance matrix in {int(time()-start)}s")
 
 	distance_matrix.to_csv(outfile)
 
@@ -95,7 +98,7 @@ def calculate_sequence_difference(msa:dict,outfile:str) -> pd.DataFrame:
 
 def UPGMA(distance_matrix:pd.DataFrame) -> dict:
 
-	print(f"\n\t\tStarting UPGMA tree building")
+	print(f"\n\tStarting UPGMA tree building")
 
 	start = time()
 
@@ -139,7 +142,7 @@ def UPGMA(distance_matrix:pd.DataFrame) -> dict:
 
 	tree[distance_matrix.loc[row,col]] = [",".join(tree[0])]
 	
-	print(f"\n\t\t\tCondensed {len(tree[0])} sequences in {int(time()-start)}s\n")
+	print(f"\n\t\tCondensed {len(tree[0])} sequences in {int(time()-start)}s")
 
 	return tree
 
@@ -194,22 +197,23 @@ def pass_subfamilies_file_check(outfile:str,labels:list) -> bool:
 
 	return True
 
-def run(msa_file:str,outdir:str) -> None:
+def run(msa_file:str,outdir:str) -> Tuple[str,str]:
 
 	start = time()
-
-	makedirs(outdir,0o700,exist_ok=True)
-
+	
 	## Read in MSA
 	file_prefix,msa = read_MSA(msa_file=msa_file)
 
-	## Create and fill initial distance matrix
-	distance_matrix:pd.DataFrame = calculate_sequence_difference(msa=msa,outfile=f"{outdir}/{file_prefix}.dist")
-
 	subfamilies_file = f"{outdir}/{file_prefix}.subfamilies"
+	distance_file = f"{outdir}/{file_prefix}.dist"
+
+	makedirs(outdir,0o700,exist_ok=True)
+
+	## Create and fill initial distance matrix
+	distance_matrix:pd.DataFrame = calculate_sequence_difference(msa=msa,outfile=distance_file)
 
 	## No re-runs
-	if pass_subfamilies_file_check(outfile=subfamilies_file,labels=sorted(msa.keys())): return None
+	if pass_subfamilies_file_check(outfile=subfamilies_file,labels=sorted(msa.keys())): return subfamilies_file,distance_file
 
 	## Perform UPGMA tree analysis
 	tree = UPGMA(distance_matrix=distance_matrix)
@@ -217,7 +221,7 @@ def run(msa_file:str,outdir:str) -> None:
 	## Identify subgroups from UPGMA collapse pattern
 	generate_subgroups(tree=tree,outfile=subfamilies_file)
 
-	return None
+	return subfamilies_file,distance_file
 
 if __name__ == '__main__':
 
