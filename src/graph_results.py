@@ -38,55 +38,6 @@ def __read_configuration_file(config_file:str=None) -> dict:
 
 	return config
 
-
-def __read_average_entropy_file(average_SE_file:str=None,msa_links:dict=None,data:dict=None) -> np.array:
-	
-	if not exists(average_SE_file):
-		print(f"\t\t[W]  Can't open average entropy file located at {average_SE_file}\n\n")
-		return -1
-
-	average_SEs = np.zeros(len(msa_links.keys()))
-	with open(average_SE_file,'r') as IN:
-		for line in IN:
-			line = line.strip()
-			if line == "":
-				continue
-			if line[0] == "#":
-				continue
-			res_num,average = line.split("\t")
-			res_num = int(res_num)
-			if res_num in msa_links.keys():
-				average_SEs[msa_links[res_num]] = float(average)
-				data[msa_links[res_num]]["ASE"] = float(average)
-
-	return data
-
-def __read_consensus_file(consensus_file:str=None,data:dict=None,msa_links:dict=None) -> list:
-
-	with open(consensus_file,'r') as IN:
-		for line in IN:
-			line = line.strip()
-
-			if line == "":
-				continue
-
-			if line[0] == "#":
-				continue
-
-			msa_pos,res_nums = line.split()
-
-			msa_pos = int(msa_pos)
-
-			if msa_pos in msa_links.keys():
-				non_gapped_data = [x for x in res_nums.split(";") if x.split(":")[0]]
-				data[msa_links[msa_pos]]["CON_RES"] = non_gapped_data[0].split(":")[0]
-				data[msa_links[msa_pos]]["RES_COUNTS"] = {x.split(":")[0]:float(x.split(":")[-1]) for x in non_gapped_data}
-				data[msa_links[msa_pos]]["NUM_RES"] = len(non_gapped_data)
-				temp_data = [int(x.split(":")[-1]) for x in non_gapped_data]
-				data[msa_links[msa_pos]]["DEV"] = abs(mean(temp_data)-median(temp_data))/(mean(temp_data))
-	
-	return data
-
 def __read_res_highlight_subset_file(file:str=None) -> dict:
 
 	if file is None or not exists(file):
@@ -139,12 +90,27 @@ def __read_SE_data(SE_file:str=None) -> list:
 			if line[0] == "#":
 				continue
 
-			pos,msa_pos,res,se,fse,num_seqs,fog = line.split()
+			pos,msa_pos,gE_i,aE_i,res,consensus,num_res,gaps = line.split()
 
-			data[int(pos)] = {"RES":res,"SE":abs(float(fse)),"NUM_RES":None,"MSA_POS":msa_pos}
-			msa_links[int(msa_pos)] = int(pos)
+			pos = int(pos)
+			msa_pos = int(msa_pos)
 
-	return data,msa_links
+			msa_links[msa_pos] = pos
+
+			# print({x.split(":")[0]:int(x.split(":")[-1]) for x in consensus.split(";") if x.split(":")[0] != '-'})
+			# exit()
+
+			data[pos] = {
+				"RES":res,
+				"SE":abs(float(gE_i)),
+				"NUM_RES":int(num_res),
+				"MSA_POS":msa_pos,
+				"ASE":float(aE_i),
+				"CON_RES":consensus.split(";")[0].split(":")[0],
+				"RES_COUNTS":{x.split(":")[0]:int(x.split(":")[-1]) for x in consensus.split(";") if x.split(":")[0]},
+			}
+
+	return msa_links,data
 
 def __read_zscale_data(zscale_file:str=None,data:dict=None,msa_links:dict=None) -> dict:
 
@@ -164,26 +130,20 @@ def __read_zscale_data(zscale_file:str=None,data:dict=None,msa_links:dict=None) 
 			msa_pos,z1,z2,z3,z4,z5 = map(float,line.split())
 			msa_pos = int(msa_pos)
 
-			if msa_pos in msa_links.keys():
-				data[msa_links[msa_pos]]["ZSCALES"] = {"Z1":z1,"Z2":z2,"Z3":z3,"Z4":z4,"Z5":z5}
+			if msa_pos not in msa_links.keys():
+				continue
+
+			data[msa_links[msa_pos]]["ZSCALES"] = {"Z1":z1,"Z2":z2,"Z3":z3,"Z4":z4,"Z5":z5}
 	
 	return data
 
 def read_data(SE_file:str=None,
-			  consensus_file:str=None,
 			  highlight_file:str=None,
-			  average_SE_file:str=None,
 			  subset:str=None,
 			  zscale_file:str=None):
 		
-	# Read in Shannon Entropy
-	data,msa_links = __read_SE_data(SE_file=SE_file)
-
-	# Read in Average Shannon Entropy
-	data = __read_average_entropy_file(average_SE_file=average_SE_file,msa_links=msa_links,data=data)
-
-	# Read in Consensus Sequence
-	data = __read_consensus_file(consensus_file=consensus_file,data=data,msa_links=msa_links)
+	# Read in Shannon Entropy Summary File
+	msa_links,data = __read_SE_data(SE_file=SE_file)
 
 	# Read in residues to highlight in the graphic
 	highlights = __read_res_highlight_subset_file(file=highlight_file)
@@ -320,7 +280,7 @@ def plot(data:dict=None,
 		if num_res < 10:
 			continue
 		if config["se_graphing"]:
-			se_graph.plot(val_x,data[val_x]["SE"],marker="*",markersize=10*(1-data[val_x]["DEV"]),color='b')
+			se_graph.plot(val_x,data[val_x]["SE"],marker="*",color='b')
 
 	if config["se_graphing"]:
 		## Expand the graph slightly past the plotted data
@@ -596,22 +556,24 @@ def plot(data:dict=None,
 	
 	return fig
 
-def run(args=None) -> None:
+def run(shannon_entropy_summary_file:str,
+		highlight_residue_file:str,
+		subset_file:str,zscale_file:str,
+		outdir:str,
+		configuration_file:str) -> None:
 
-	ref = args.shannon_entropy_file.split("/")[-1].split(".")[0]
-	makedirs(args.outdir,mode=0o755,exist_ok=True)
+	ref = shannon_entropy_summary_file.split("/")[-1].split(".")[0]
+	makedirs(outdir,mode=0o755,exist_ok=True)
 
-	data, highlights = read_data(SE_file=args.shannon_entropy_file,
-							  consensus_file=args.consensus_sequence_file,
-							  highlight_file=args.highlight_residues,
-							  average_SE_file=args.average_entropy_file,
-							  subset=args.subset,
-							  zscale_file=args.zscale_file)
+	data, highlights = read_data(SE_file=shannon_entropy_summary_file,
+							  highlight_file=highlight_residue_file,
+							  subset=subset_file,
+							  zscale_file=zscale_file)
 	
 	plot(data=data,
 	     highlights=highlights,
-		 config_file=args.configuration,
-		 fname_out=f"{args.outdir}/{ref}.png")
+		 config_file=configuration_file,
+		 fname_out=f"{outdir}/{ref}.png")
 	
 	return None
 
@@ -619,13 +581,20 @@ if __name__ == "__main__":
 
 	GetOptions = ArgumentParser()
 
-	GetOptions.add_argument("-s","--shannon_entropy_file",required=True,type=str)
+	GetOptions.add_argument("-s","--shannon_entropy_summary_file",required=True,type=str)
 	GetOptions.add_argument("-o","--outdir",required=False,type=str,default="se_graphics")
-	GetOptions.add_argument("-y","--highlight_residues",required=False,type=str)
-	GetOptions.add_argument("-c","--consensus_sequence_file",required=False,type=str)
-	GetOptions.add_argument("-a","--average_entropy_file",required=False)
+	GetOptions.add_argument("-y","--highlight_residue_file",required=False,type=str)
 	GetOptions.add_argument("-z","--zscale_file",required=False,type=str)
-	GetOptions.add_argument("-f","--subset",required=False,type=parse_range,help="Select subset of residues to plot, like 1-100")
-	GetOptions.add_argument("-l","--configuration",required=False,type=str)
+	GetOptions.add_argument("-f","--subset_file",required=False,type=parse_range,help="Select subset of residues to plot, like 1-100")
+	GetOptions.add_argument("-l","--configuration_file",required=False,type=str)
 
-	run(args=GetOptions.parse_known_args()[0])
+	args=GetOptions.parse_known_args()[0]
+
+	run(
+		shannon_entropy_summary_file=args.shannon_entropy_summary_file,
+		outdir=args.outdir,
+		highlight_residues=args.highlight_residue_file,
+		zscale_file=args.zscale_file,
+		subset_file=args.subset_file,
+		configuration=args.configuration_file
+)
