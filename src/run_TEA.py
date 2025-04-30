@@ -2,7 +2,8 @@
 
 from argparse import ArgumentParser
 from shannon_entropy import run as shannon_entropy
-from z_scales import run as z_scales
+from protein_descriptors import run as protein_descriptors
+from protein_descriptors import get_file_name
 from graph_results import run as graph_results
 
 def run(args:ArgumentParser.parse_known_args) -> None:
@@ -20,10 +21,10 @@ def run(args:ArgumentParser.parse_known_args) -> None:
 	)
 
 	print("\n\n\tIdentifying physiochemical patterns of residue positions.")
-	z_scales(
-		msa_file=args.msa_file,
+	protein_descriptors(
 		outdir=args.outdir,
-		descriptors=args.descriptors
+		descriptor_file=args.descriptors,
+		summary_file=f"{args.outdir}/shannon_entropy.summary",
 	)
 
 	print("\n\n\tGraphing TEA-O results.")
@@ -32,7 +33,7 @@ def run(args:ArgumentParser.parse_known_args) -> None:
 		outdir=f"{args.outdir}",
 		highlight_residue_file=args.highlight_file,
 		subset_file=args.subset_file,
-		zscale_file=f"{args.outdir}/zscales.tsv",
+		descriptor_file=f"{args.outdir}/prot_descriptors_{get_file_name(args.descriptors)}.tsv",
 		configuration_file=args.configuration
 	)
 
@@ -51,7 +52,7 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-r","--reference",default=None,type=str)
 	GetOptions.add_argument("-e","--tea_mode",default="TEAO",choices=["TEA","TEAO"])
 	GetOptions.add_argument("-t","--threads",type=int,default=1)
-	GetOptions.add_argument("-d","--descriptors",default='Zscale Sandberg')
+	GetOptions.add_argument("-d","--descriptors",default=f"{dirname(abspath(__file__))}/../DB_files/ZscaleSandberg.txt")
 	GetOptions.add_argument("-l","--highlight_file",default=None,type=str)
 	GetOptions.add_argument("-f","--subfamily_file",default=None,type=str)
 	GetOptions.add_argument("-s","--subset_file",default=None,type=str)

@@ -112,12 +112,12 @@ def __read_SE_data(SE_file:str=None) -> list:
 
 	return msa_links,data
 
-def __read_zscale_data(zscale_file:str=None,data:dict=None,msa_links:dict=None) -> dict:
+def __read_descriptor_data(descriptor_file:str=None,data:dict=None,msa_links:dict=None) -> dict:
 
-	if zscale_file is None or not exists(zscale_file):
+	if descriptor_file is None or not exists(descriptor_file):
 		return None
 
-	with open(zscale_file,'r') as IN:
+	with open(descriptor_file,'r') as IN:
 		for line in IN:
 			line = line.strip()
 
@@ -125,22 +125,26 @@ def __read_zscale_data(zscale_file:str=None,data:dict=None,msa_links:dict=None) 
 				continue
 
 			if line[0] == "#":
+				labels = line.replace("#","").strip().split()[1:]
 				continue
 
-			msa_pos,z1,z2,z3,z4,z5 = map(float,line.split())
-			msa_pos = int(msa_pos)
+			parts = line.split()
+			msa_pos = int(float(parts[0]))
+			descriptor_values = list(map(float, parts[1:]))
 
 			if msa_pos not in msa_links.keys():
 				continue
 
-			data[msa_links[msa_pos]]["ZSCALES"] = {"Z1":z1,"Z2":z2,"Z3":z3,"Z4":z4,"Z5":z5}
+			descriptor_dict = {f"{i}": val for i, val in zip(labels, descriptor_values)}
+
+			data[msa_links[msa_pos]]["DESCRIPTORS"] = descriptor_dict
 	
 	return data
 
 def read_data(SE_file:str=None,
 			  highlight_file:str=None,
 			  subset:str=None,
-			  zscale_file:str=None):
+			  descriptor_file:str=None):
 		
 	# Read in Shannon Entropy Summary File
 	msa_links,data = __read_SE_data(SE_file=SE_file)
@@ -148,8 +152,8 @@ def read_data(SE_file:str=None,
 	# Read in residues to highlight in the graphic
 	highlights = __read_res_highlight_subset_file(file=highlight_file)
 
-	# Read in Z-Scale data
-	data = __read_zscale_data(zscale_file=zscale_file,data=data,msa_links=msa_links)
+	# Read in protein descriptor data
+	data = __read_descriptor_data(descriptor_file=descriptor_file,data=data,msa_links=msa_links)
 	
 	# Read subset file and filter data to only include subset residues
 	if subset is not None:
@@ -161,11 +165,11 @@ def read_data(SE_file:str=None,
 
 def plot(data:dict=None,
 		 highlights:dict=None,
+		 descriptor_file:str=None,
 		 config_file=None,
 		 fname_out=None) -> None:
 
 	aas = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
-	scales = ['Z1','Z2','Z3']
 
 	# Read in configuration file
 	config = __read_configuration_file(config_file=config_file)
@@ -194,7 +198,7 @@ def plot(data:dict=None,
 	plot_columns = 1
 	
 	# List of plots that take 1 row
-	one_row_plots = ["se_graphing", "specificity_graphing", "number_of_residues", "residue_distribution", "zscale_distribution"]
+	one_row_plots = ["se_graphing", "specificity_graphing", "number_of_residues", "residue_distribution", "descriptor_distribution"]
 	plot_rows = sum(1 for plot in one_row_plots if config[plot])
 
 	# Add 2 rows if residue_presence_matrix is enabled
@@ -242,13 +246,13 @@ def plot(data:dict=None,
 			first_plot = res_dist_graph
 		current_row += 1
 		final_plot = res_dist_graph
-	# Z-scale distribution
-	if config["zscale_distribution"]:
-		zscale_graph = plt.subplot2grid((plot_rows,plot_columns),(current_row,0))
+	# protein descriptor distribution
+	if config["descriptor_distribution"]:
+		descriptor_graph = plt.subplot2grid((plot_rows,plot_columns),(current_row,0))
 		if current_row == 0:
-			first_plot = zscale_graph
+			first_plot = descriptor_graph
 		current_row += 1
-		final_plot = zscale_graph
+		final_plot = descriptor_graph
 
 	## Load CSS colors for iterative coloring
 	colors = mcolors.XKCD_COLORS
@@ -498,38 +502,45 @@ def plot(data:dict=None,
 	# # ## ZSCALES
 	# # ###################################################################################################################
 
-	if config["zscale_distribution"]:
+	if config["descriptor_distribution"]:
 
-		# Store Z-sclales in matrix
-		m = np.zeros((len(scales), len(res_nums) +1))  # For clarity, show only first 3 Z-scales
+		from os.path import dirname,abspath
 
-		for i,scale in enumerate(scales):
+		ylabels = list(data[val_x]["DESCRIPTORS"].keys())
+
+		# Store descriptors in matrix
+		m = np.zeros((len(ylabels), len(res_nums) +1))
+
+		for i,descr in enumerate(ylabels):
 			for index,val_x in enumerate(res_nums):
-				m[i][index] = data[val_x]["ZSCALES"][scale]
+				m[i][index] = data[val_x]["DESCRIPTORS"][descr]
 
-		zscale_graph.matshow(m,aspect='auto',cmap='Reds')
+		descriptor_graph.matshow(m,aspect='auto',cmap='Reds')
+
+		if 'ZscaleSandberg' in descriptor_file:
+			ylabels = ['lipophilicity','steric bulk/polarizability','polarity/charge']
 
 		## Setup Y-Axis
-		zscale_graph.set_yticks([i for i in range(len(scales))],labels=scales[::-1],font='monospace')
+		descriptor_graph.set_yticks([i for i in range(len(ylabels))],labels=ylabels[::-1],font='monospace')
 
 		## Setup X-Axis
-		zscale_graph.xaxis.set_ticks(range(len(res_nums)))
+		descriptor_graph.xaxis.set_ticks(range(len(res_nums)))
 		labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
 		# print(labels)
 		# print(range(len(res_nums)))
-		# zscale_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
+		# descriptor_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
 		# res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-		# zscale_graph.xaxis.set_minor_locator(MultipleLocator(1))
+		# descriptor_graph.xaxis.set_minor_locator(MultipleLocator(1))
 		
 		# Set and rotate major tick labels
-		zscale_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
-		zscale_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=False,labelbottom=False, pad=10)
-		zscale_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False, pad=10)
+		descriptor_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
+		descriptor_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=False,labelbottom=False, pad=10)
+		descriptor_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False, pad=10)
 
-		zscale_graph.spines['bottom'].set_visible(False)
-		zscale_graph.spines['top'].set_visible(False)
-		zscale_graph.spines['left'].set_visible(False)
-		zscale_graph.spines['right'].set_visible(False)
+		descriptor_graph.spines['bottom'].set_visible(False)
+		descriptor_graph.spines['top'].set_visible(False)
+		descriptor_graph.spines['left'].set_visible(False)
+		descriptor_graph.spines['right'].set_visible(False)
 
 	## Setup top and bottom X-Axis
 	# first_plot.set_xticks([])
@@ -558,7 +569,7 @@ def plot(data:dict=None,
 
 def run(shannon_entropy_summary_file:str,
 		highlight_residue_file:str,
-		subset_file:str,zscale_file:str,
+		subset_file:str,descriptor_file:str,
 		outdir:str,
 		configuration_file:str) -> None:
 
@@ -568,11 +579,12 @@ def run(shannon_entropy_summary_file:str,
 	data, highlights = read_data(SE_file=shannon_entropy_summary_file,
 							  highlight_file=highlight_residue_file,
 							  subset=subset_file,
-							  zscale_file=zscale_file)
+							  descriptor_file=descriptor_file)
 	
 	plot(data=data,
 	     highlights=highlights,
 		 config_file=configuration_file,
+		 descriptor_file=descriptor_file,
 		 fname_out=f"{outdir}/{ref}.png")
 	
 	return None
@@ -584,7 +596,7 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-s","--shannon_entropy_summary_file",required=True,type=str)
 	GetOptions.add_argument("-o","--outdir",required=False,type=str,default="se_graphics")
 	GetOptions.add_argument("-y","--highlight_residue_file",required=False,type=str)
-	GetOptions.add_argument("-z","--zscale_file",required=False,type=str)
+	GetOptions.add_argument("-z","--descriptor_file",required=False,type=str)
 	GetOptions.add_argument("-f","--subset_file",required=False,type=parse_range,help="Select subset of residues to plot, like 1-100")
 	GetOptions.add_argument("-l","--configuration_file",required=False,type=str)
 
@@ -594,7 +606,7 @@ if __name__ == "__main__":
 		shannon_entropy_summary_file=args.shannon_entropy_summary_file,
 		outdir=args.outdir,
 		highlight_residues=args.highlight_residue_file,
-		zscale_file=args.zscale_file,
+		descriptor_file=args.descriptor_file,
 		subset_file=args.subset_file,
 		configuration=args.configuration_file
 )

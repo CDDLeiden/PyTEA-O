@@ -7,9 +7,6 @@ msafile="${SCRIPT_DIR}/example.fasta"
 outputdir="${SCRIPT_DIR}/results"
 refid="0_0_0"
 
-# Create output directory
-mkdir -p ${outputdir}
-
 # Create subgroups
 echo "Make subgroups"
 python ${codebasedir}/upgma_subfam_grouping.py \
