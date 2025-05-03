@@ -11,6 +11,7 @@ from convert_alignment import read_MSA
 from warnings import simplefilter
 import gc
 from typing import Tuple
+from utils import load_msa
 
 simplefilter(action='ignore',category=pd.errors.PerformanceWarning)
 
@@ -25,7 +26,7 @@ elif 'win' in sys.platform:
 	multiprocessing = 'multiprocessing'
 mp = __import__(multiprocessing)
 
-def generate_distance_matrix(msa:dict) -> pd.DataFrame:
+def generate_distance_matrix(msa:pd.DataFrame) -> pd.DataFrame:
 
 	"""Returns an NxN numpy matrix with values set to -1.
 
@@ -36,25 +37,27 @@ def generate_distance_matrix(msa:dict) -> pd.DataFrame:
 		np.array: NxN array with each element being set to -1
 	"""
 
-	keys:dict.keys = sorted(msa.keys())
+	keys = sorted(msa.index)
 
 	return pd.DataFrame(np.zeros([len(msa),len(msa)]),columns=keys,index=keys)
 
-def distance(sequence_a_loc):
+def distance(sequence_a_loc:pd.DataFrame):
 
-	sequence_a = sequences[sequence_a_loc]
+	sequence_a = sequences.loc[sequence_a_loc,'array']
 
-	distances = {x:0 for x in sequences.keys()}
+	_,seq_length = sequence_a.shape
 
-	for sequence_b_loc in sorted(sequences.keys()):
+	distances = {x:0 for x in sequences.index}
+
+	for sequence_b_loc in sorted(distances.keys()):
 		if sequence_b_loc == sequence_a_loc:
 			distances[sequence_b_loc] = np.inf
-			break
-		distances[sequence_b_loc] = sum(1 for a,b in zip(sequence_a,sequences[sequence_b_loc]) if a!=b)
+			continue
+		distances[sequence_b_loc] = np.sum(np.square(sequence_a-sequences.loc[sequence_b_loc,'array']))/2
 
 	return [sequence_a_loc,distances]
 
-def calculate_sequence_difference(msa:dict,outfile:str) -> pd.DataFrame:
+def calculate_sequence_difference(msa:pd.DataFrame,outfile:str) -> pd.DataFrame:
 
 	"""Calculates the distances between sequences in an MSA
 
@@ -71,7 +74,7 @@ def calculate_sequence_difference(msa:dict,outfile:str) -> pd.DataFrame:
 
 	distance_matrix = generate_distance_matrix(msa)
 
-	keys:dict.keys = sorted(msa.keys())
+	keys = sorted(msa.index)
 	global sequences
 	sequences = msa
 	
@@ -197,15 +200,21 @@ def pass_subfamilies_file_check(outfile:str,labels:list) -> bool:
 
 	return True
 
-def run(msa_file:str,outdir:str) -> Tuple[str,str]:
+def run(msa:str|pd.DataFrame,outdir:str) -> Tuple[str,str]:
 
 	start = time()
 	
 	## Read in MSA
-	file_prefix,msa = read_MSA(msa_file=msa_file)
+	if type(msa) is not pd.DataFrame and not isfile(msa):
+		raise(TypeError)
+	elif type(msa) is pd.DataFrame:
+		pass
+	elif isfile(msa):
+		msa = load_msa(msa_file=msa,outdir=outdir)
 
-	subfamilies_file = f"{outdir}/{file_prefix}.subfamilies"
-	distance_file = f"{outdir}/{file_prefix}.dist"
+
+	subfamilies_file = f"{outdir}/upgma.subfamilies"
+	distance_file = f"{outdir}/upgma.dist"
 
 	makedirs(outdir,0o700,exist_ok=True)
 
@@ -230,4 +239,4 @@ if __name__ == '__main__':
 	parser.add_argument("-o","--outdir",default="UPGMA_SUBFAMILY_GROUPINGS")
 	args = parser.parse_args()
 
-	run(msa_file=args.msa_file,outdir=args.outdir)
+	run(msa=args.msa_file,outdir=args.outdir)
