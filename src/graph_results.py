@@ -134,7 +134,7 @@ def __read_zscale_data(zscale_file:str=None,data:dict=None,msa_links:dict=None) 
 				continue
 
 			data[msa_links[msa_pos]]["ZSCALES"] = {"Z1":z1,"Z2":z2,"Z3":z3,"Z4":z4,"Z5":z5}
-	
+
 	return data
 
 def read_data(SE_file:str=None,
@@ -149,15 +149,15 @@ def read_data(SE_file:str=None,
 	highlights = __read_res_highlight_subset_file(file=highlight_file)
 
 	# Read in Z-Scale data
-	data = __read_zscale_data(zscale_file=zscale_file,data=data,msa_links=msa_links)
+	if zscale_file: data = __read_zscale_data(zscale_file=zscale_file,data=data,msa_links=msa_links)
 	
 	# Read subset file and filter data to only include subset residues
-	if subset is not None:
+	if subset:
 		subset_pos = [i for i in range(subset[0]-1,subset[1]-1)]
 		data = {key: value for key, value in data.items() if key in subset_pos}
 	
 	return data, highlights
-	
+
 
 def plot(data:dict=None,
 		 highlights:dict=None,
@@ -179,7 +179,7 @@ def plot(data:dict=None,
 	# Number of residues in the reference sequence
 	len_of_seq = len(res_nums)
 
-	num_ress = np.zeros(len_of_seq)
+	num_ress = np.array([sum([1 for x in data[res]["RES_COUNTS"].keys() if (data[res]["RES_COUNTS"][x] != 0 and x not in ["B","X","Z","-"]) ]) for res in res_nums])
 
 	# Font size of tick labels
 	font_size = 6
@@ -270,17 +270,6 @@ def plot(data:dict=None,
 	# Residue and residue number labels
 	# labels = [f"{data[x]["RES"]} [{x+1}]" if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
 	labels = [f"{data[x]['RES']} [{x+1}]" if x%2 != 0 else f"{data[x]['RES']}" for x in res_nums]
-
-	# Highlight residues with near equal representation in MSA
-	for i,val_x in enumerate(res_nums):
-		num_res = data[val_x]["NUM_RES"]
-		num_res -= 1 if '-' in data[val_x]["RES_COUNTS"].keys() else 0
-		num_res -= 1 if 'X' in data[val_x]["RES_COUNTS"].keys() else 0
-		num_ress[i] = num_res
-		if num_res < 10:
-			continue
-		if config["se_graphing"]:
-			se_graph.plot(val_x,data[val_x]["SE"],marker="*",color='b')
 
 	if config["se_graphing"]:
 		## Expand the graph slightly past the plotted data
@@ -586,15 +575,15 @@ if __name__ == "__main__":
 	GetOptions.add_argument("-y","--highlight_residue_file",required=False,type=str)
 	GetOptions.add_argument("-z","--zscale_file",required=False,type=str)
 	GetOptions.add_argument("-f","--subset_file",required=False,type=parse_range,help="Select subset of residues to plot, like 1-100")
-	GetOptions.add_argument("-l","--configuration_file",required=False,type=str)
+	GetOptions.add_argument("-c","--configuration_file",required=False,type=str)
 
 	args=GetOptions.parse_known_args()[0]
 
 	run(
 		shannon_entropy_summary_file=args.shannon_entropy_summary_file,
 		outdir=args.outdir,
-		highlight_residues=args.highlight_residue_file,
+		highlight_residue_file=args.highlight_residue_file,
 		zscale_file=args.zscale_file,
 		subset_file=args.subset_file,
-		configuration=args.configuration_file
+		configuration_file=args.configuration_file
 )
