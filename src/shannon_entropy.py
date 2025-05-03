@@ -13,126 +13,13 @@ from time import time
 from convert_alignment import read_MSA
 from typing import Tuple
 from upgma_subfam_grouping import run as run_upgma
+from utils import load_msa
 
 multiprocessing = None
 if 'linux' or 'win' in sys.platform: multiprocessing = 'multiprocessing'
 elif 'darwin' in sys.platform: multiprocessing = 'multiprocess'
 elif 'win' in sys.platform: multiprocessing = 'multiprocessing'
 mp = __import__(multiprocessing)
-
-# def give_me_time(secs:float) -> str:
-
-# 	days,seconds = divmod(secs,60*60*24)
-# 	hours,seconds = divmod(seconds,60*60)
-# 	minutes,seconds = divmod(seconds,60)
-
-# 	if branch_point%10 == 0:
-# 		print(f"\t[{branch_point: >{buffer}d}/{total_branch_points}]  Processed 10 branches in {give_me_time(time()-branch_start)}")
-# 		print(f"\t\tElapsed Time: {give_me_time(time()-total_start)}")
-# 		print(f"\t\tAverage Time Per Branch: {give_me_time(median(times))}")
-# 		print(f"\t\tMaximum Branch Time: {give_me_time(max_time)}")
-# 		print(f"\t\tMinimum Branch Time: {give_me_time(min_time)}")
-# 		print(f"\t\tETA to completion: {give_me_time(median(times)*(total_branch_points-branch_point))}")
-# 		branch_start = time()
-
-# 	return f"{int(days)}d {int(hours)}h {int(minutes)}m {int(seconds)}s"
-
-def load_msa(msa_file:str,outdir) -> pd.DataFrame:
-
-	"""
-	Read in and store MSA, checking whether length is same for all sequences present
-	"""
-
-	print(f"\n\t\tLoading alignment data from {msa_file}")
-
-	data_dir = f"{outdir}/.data"
-	pickle_file = f"{data_dir}/MSA.pkl"
-	makedirs(data_dir,0o700,exist_ok=True)
-
-	if isfile(pickle_file):
-		print(f"\n\t\t\t[N] Found previously processed MSA data")
-		print(f"\n\t\t\t[N] Loading previously processed MSA data")
-		start = time()
-		arrayed_MSA = pd.read_pickle(pickle_file,compression='gzip')
-		print(f"\n\t\t\tPreviously processed MSA data loaded in {time()-start:.0f}s")
-		return arrayed_MSA
-
-	print(f"\n\t\tReading alignment data from MSA file {msa_file}")
-
-	start = time()
-	_,msa = read_MSA(msa_file=msa_file)
-
-	print(f"\n\t\t\tAlignment data loaded in {time()-start:.0f}s")
-
-	msa_keys = msa.keys()
-
-	msa = {x:[i for i in msa[x]] for x in msa_keys}
-
-	len_max = max([len(msa[x]) for x in msa_keys])
-	len_min = min([len(msa[x]) for x in msa_keys])
-
-	if len_min != len_max:
-		print(f"\n\t[E]  Aligned sequences do not have the same length (min/max: {len_min}/{len_max}).")
-		print(f"\n\t[N]  Terminating Two-Entropy calculations.")
-		exit()
-
-	pause = time()
-
-	print(f"\n\t\tProcessing alignment data")
-
-	arrayed_MSA = pd.DataFrame({'array':np.array(np.zeros((len(AAs),len_max)) for key in msa_keys)},dtype=object,index=msa_keys)#,columns=[x for x in msa_keys])
-
-
-	for key in msa_keys:
-		for index,res in enumerate(msa[key]):
-			arrayed_MSA.loc[key,'array'][AAs.index(res)][index] = 1
-
-	arrayed_MSA.to_pickle(pickle_file,compression='gzip')
-
-	print(f"\n\t\t\tAlignment data prcocessed in {time()-pause:.0f}s")
-
-	return arrayed_MSA
-
-def load_similarity_matrix(matrix:str) -> dict:
-
-	matrix_dir = ("/".join(__file__.split("/")[0:-2]))+"/DB_files"
-	labels = []
-	sim_mat = {}
-	file = None
-
-	if os.path.exists(f"{matrix_dir}/{matrix.upper()}.txt"):
-		file = f"{matrix_dir}/{matrix.upper()}.txt"
-
-	elif os.path.exists(matrix):
-		file = matrix
-	
-	if file == None:
-		print(f"\n\n\t[E]  {matrix} is not a pre-existing DB, and could not find custom DB file {matrix}\n\n")
-		exit()
-
-	with open(file,'r') as IN:
-		for line in IN:
-			
-			line = line.strip()
-			
-			if line == "":
-				continue
-
-			if line[0] == "" or line[0] == "#":
-				continue
-
-			if line[0] == "!":
-				labels = [x for x in line.split()[1:]]
-				sim_mat = {x:{y:0 for y in labels} for x in labels}
-				continue
-
-			data = line.split()
-			current_label = data[0].strip()
-
-			for index,score in enumerate(data[1:]):
-				sim_mat[current_label][labels[index]] = float(score)
-
-		return sim_mat
 
 def process_colummns(msa:pd.DataFrame) -> np.ndarray:
 
@@ -243,8 +130,6 @@ def generate_sequence_consensus(msa:pd.DataFrame,outdir:str) -> np.ndarray:
 
 	with open(outfile,'w') as OUT:
 		OUT.write(f"## MSA_position\tRes:Count;\n")
-
-		residues,msa_length = msa.loc[msa.index[0],'array'].shape
 
 		for msa_index,datum in enumerate(np.sum(msa.loc[msa.index,'array'],axis=0).T):
 
@@ -386,29 +271,30 @@ def TEA(subfamilies_file:str,outdir:str,msa:pd.DataFrame,threads:int,mode:str,ms
 
 		return results
 
+	## Make the MSA globally accessible
+	global g_msa
+	g_msa = msa
+
 	temp_entropy_file_name = "intermediate_average_entropies.teao"
 	if mode == "TEAO":
-		subfamilies_file,_ = run_upgma(msa_file=msa_file,outdir=outdir)
+		subfamilies_file,_ = run_upgma(msa=msa,outdir=outdir)
 		temp_entropy_file_name = "intermediate_average_entropies.teao"
 	
 	## Default to TEA-O messages
 	if mode == "TEA" and not subfamilies_file:
 		print("\n\t\t\t[W] Subfamily definition file not provided, defaulting to TEA-O algorithm...")
-	if not exists(subfamilies_file):
+	if mode == "TEA" and not isfile(subfamilies_file):
 		print(f"\n\t\t\t[W] Subfamily definition file {subfamilies_file} not found, defaulting to TEA-O algorithm...")
 		subfamilies_file,_ = run_upgma(msa_file=msa_file,outdir=outdir)
 
 	subfamilies:dict = read_subfamilies(subfamilies_file)
 
-	## Make the MSA globally accessible
-	global g_msa
-	g_msa = msa
 
 	temp_entropy_file = f"{outdir}/.data/{temp_entropy_file_name}"
 
 	start = time()
 
-	num_of_seqs,num_of_MSA_res = msa.loc[g_msa.index[0],'array'].shape
+	_,num_of_MSA_res = msa.loc[g_msa.index[0],'array'].shape
 
 	keys = [x for x in subfamilies.keys()]
 
@@ -426,7 +312,7 @@ def TEA(subfamilies_file:str,outdir:str,msa:pd.DataFrame,threads:int,mode:str,ms
 		for subfamily in keys:
 			if subfamily in results.keys():
 				continue
-			executor.apply_async(worker,args=(subfamily,subfamilies[subfamily],queue))#,subfamilies[subfamily],queue,))
+			executor.apply_async(worker,args=(subfamily,subfamilies[subfamily],queue))
 		executor.close()
 		executor.join()
 
@@ -469,7 +355,7 @@ def run(msa_file:str,subfamilies_file:str,outdir:str,reference_id:str,threads:in
 
 	print(f"\n\tTwo Entropy Analysis started")
 	
-	total_start = time()
+	start = time()
 
 	global AAs
 	AAs = ['A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y','X','Z','-']
@@ -480,63 +366,15 @@ def run(msa_file:str,subfamilies_file:str,outdir:str,reference_id:str,threads:in
 
 	msa:pd.DataFrame = load_msa(msa_file,outdir=outdir)
 
-	n_seq, n_res = msa.shape
-
 	consensus = generate_sequence_consensus(msa=msa,outdir=outdir)
 	
 	gE_i,a_i,G_i = superfamily_shannon_entropy(msa=msa,outdir=outdir)
 
-	aE_i = TEA(subfamilies_file=subfamilies_file,outdir=outdir,msa=msa,threads=threads,mode=mode,msa_file=msa_file)
+	aE_i:np.array = TEA(subfamilies_file=subfamilies_file,outdir=outdir,msa=msa,threads=threads,mode=mode,msa_file=msa_file)
 
 	write_references(reference_id=reference_id,msa=msa,global_SE=gE_i,average_SE=aE_i,residues=a_i,gaps=G_i,outdir=outdir, consensus=consensus)
 
-# def calculate_similarity_score(seq, method='BLOSUM62'):
-#     """
-#     Using BLOSUM62 matrix. Excluded diagonal and divide by length sequence
-#     """
-#     aligner = Align.PairwiseAligner()
-#     aligner.substitution_matrix = substitution_matrices.load(method)
-
-#     amino_acids = SE.natural_amino_acids()
-
-#     # Remove gaps from sequence
-#     # Remove non AA characters from sequence
-#     full_length = len(seq)
-#     seq = seq.replace('-', '')
-#     for char in seq:
-#         if char not in amino_acids:
-#             seq = seq.replace(char, '')
-			
-#     num_gaps = full_length - len(seq)
-	
-#     # Set gap penalty
-#     gap_penalty = 0.5 / full_length  # Penalty for each gap. 0.5 is max similarity score
-
-#     # Make matrix
-#     M = np.empty((len(seq), len(seq)), dtype='int')
-
-#     # Get upper/lower triangle (including diagonal) and calculate score
-#     for i in range(len(seq)):
-#         for num, j in enumerate(seq):
-#             score = aligner.substitution_matrix[str(seq[i]), str(seq[num])]
-#             M[i, num] = float(score)
-	
-#     # Calculate score by summing values
-#     sum_tri = np.sum(M[np.triu_indices(len(seq), k=1)])  # Exclude diagonal
-#     sum_diagonal = np.trace(M)  
-#     if len(seq) == 1:  # Cannot (and should not) be calculated (Runtimerror)
-#         score = np.nan
-#     else:
-#         score = sum_tri / sum_diagonal  # Divide by diagonal for normalization between residues
-#         score = score - (gap_penalty * num_gaps)  # Subtract gap penalty
-#         score = round(score / full_length, 2)
-	
-#     # If score is negative, set to 0
-#     if score < 0:
-#         score = 0
-
-#     return score
-
+	return None
 
 if __name__ == '__main__':
 
