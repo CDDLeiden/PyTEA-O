@@ -8,6 +8,4 @@ DB_files/nodes.dmp
 DB_files/prot.accession2taxid.FULL.gz
 DB_files/prot.accession2taxid.FULL.gz.md5
 
-example/example_MSA
 example/results
-example_MSA_grouping.txt
