@@ -1,96 +1,100 @@
-#!/usr/bin/env python3
+from os import makedirs,path
+from pandas import DataFrame,read_pickle,to_pickle
+from time import time
+from numpy import zeros,array
 
-import os
-import json
-import pickle
-import subprocess
-import numpy as np
-from Bio import AlignIO
-from Bio import pairwise2 as pw2
+def load_msa(msa_file:str,outdir) -> DataFrame:
 
-def dict_to_json(obj, out_fp):
-    with open(out_fp, 'w') as fp:
-        json.dump(obj, fp)
+	"""
+	Read in and store MSA, checking whether length is same for all sequences present
+	"""
 
-def save_commandline_args(script, args, folder):
-        script_base = script.split('.')[0]
-        fp = os.path.join(folder, script_base + '.json')
-        args['commit'] = fetch_git_commit()  # Add git commit to dict
-        dict_to_json(args, fp)
+	print(f"\n\t\tLoading alignment data from {msa_file}")
 
-def fetch_git_commit():
-    hash = subprocess.check_output(['git', 'rev-parse', '--short', 'HEAD']).decode('ascii').strip()
-    return hash
+	AAs = ['A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y','X','Z','-']
 
-def save_pickle(obj, out_fp):
-    with open(out_fp, 'wb') as f:
-        pickle.dump(obj, f)
+	data_dir = f"{outdir}/.data"
+	pickle_file = f"{data_dir}/MSA.pkl"
+	makedirs(data_dir,0o700,exist_ok=True)
 
-def load_pickle(in_fp):
-    obj = pickle.load(open(in_fp, "rb" ))
-    return obj
+	if path.isfile(pickle_file):
+		print(f"\n\t\t\t[N] Found previously processed MSA data")
+		print(f"\n\t\t\t[N] Loading previously processed MSA data")
+		start = time()
+		arrayed_MSA = read_pickle(pickle_file,compression='gzip')
+		print(f"\n\t\t\tPreviously processed MSA data loaded in {time()-start:.0f}s")
+		return arrayed_MSA
 
-def rename(fp, extension):
-    pre, _ = os.path.splitext(fp)
-    renamed = pre + extension
-    return renamed
+	print(f"\n\t\tReading alignment data from MSA file {msa_file}")
 
-def sequence_identity(seq1: str, seq2: str) -> float:
-    """Calculate sequence identity of two sequences
+	start = time()
+	msa = read_MSA(msa_file=msa_file)
 
-    Args:
-        seq1 (str): one of the two sequences to calculate the identity for
-        seq2 (str): one of the two sequences to calculate the identity for
+	print(f"\n\t\t\tAlignment data loaded in {time()-start:.0f}s")
 
-    Returns:
-        float: percent identity between seq1 and seq2
-    """
-    global_align = pw2.align.globalxx(seq1, seq2)
-    matches = global_align[0][2]
-    seq_length = len(global_align[0][0])
-    percent_match = (matches / seq_length) * 100
-    return percent_match
+	msa_keys = msa.keys()
 
-def pairwise_seqidentity_matrix(msa_fp: str) -> np.array:
-    """
-    Calculate the pairwise sequence identity between all sequences from a MSA (.fasta format) and return as as array.
-    Gaps are removed from the MSA and the identities are stored in the bottom half of a np.array
+	msa = {x:[i for i in msa[x]] for x in msa_keys}
 
-    The identitiy array is stored in the same location as the MSA file with the extension '_seqidentity.pkl'
-    The labels of the identity array are stored in the same location as the MSA file with the extension '_seqidentity_labels.pkl'
+	len_max = max([len(msa[x]) for x in msa_keys])
+	len_min = min([len(msa[x]) for x in msa_keys])
 
-    Args:
-        msa_fp (str): filepath of the MSA
+	if len_min != len_max:
+		print(f"\n\t[E]  Aligned sequences do not have the same length (min/max: {len_min}/{len_max}).")
+		print(f"\n\t[N]  Terminating Two-Entropy calculations.")
+		exit()
 
-    Returns:
-        np.array: _description_
-    """
-    identity_matrix_file_extension = '_seqidentity.pkl'
-    identity_matrix_labels_file_extension = '_seqidentity_labels.pkl'
+	pause = time()
 
-    alignment = AlignIO.read(msa_fp, "fasta")  # Read alignment
-    labels = [rec.id for rec in alignment]
+	print(f"\n\t\tProcessing alignment data")
 
-    M = np.empty((len(alignment), len(alignment)))  # Create output matrix
+	arrayed_MSA = DataFrame({'array':array(zeros((len(AAs),len_max)) for key in msa_keys)},dtype=object,index=msa_keys)#,columns=[x for x in msa_keys])
 
-    for i in range(len(alignment)):
-        print(i)
-        for num, j in enumerate(alignment):
-            if i >= num:  # Only calculate lower triangle, including diagonal, to save time
-                identity = sequence_identity(alignment[i].seq.replace('-', '') , j.seq.replace('-', ''))  # Remove gaps from sequence
-                identity = round(identity, 2)
-                M[i, num] = float(identity)
-            else:
-                M[i, num] = 0
-    
-    save_pickle(M, rename(msa_fp, identity_matrix_file_extension))  # Save matrix  and labels as pkl file
-    save_pickle(labels, rename(msa_fp, identity_matrix_labels_file_extension))
-    return M
+	for key in msa_keys:
+		for index,res in enumerate(msa[key]):
+			arrayed_MSA.loc[key,'array'][AAs.index(res)][index] = 1
 
-def sequence_identity(seq1: str, seq2: str) -> float:
-    global_align = pw2.align.globalxx(seq1, seq2)
-    matches = global_align[0][2]
-    seq_length = len(global_align[0][0])
-    percent_match = (matches / seq_length) * 100
-    #print(percent_match)
-    return percent_match
+	arrayed_MSA.to_pickle(pickle_file,compression='gzip')
+
+	print(f"\n\t\t\tAlignment data prcocessed in {time()-pause:.0f}s")
+
+	return arrayed_MSA
+
+def read_MSA(msa_file:str=None) -> tuple[dict,str]:
+
+	"""Reads an MSA from a given file, and converts it to a dictionary object, with loci and sequences as keys and
+	values, repectively.
+
+	Inputs:
+		MSA_File: File path to MSA, either in FASTA or Clustal format.
+
+	Returns:
+		MSA: Dictionary object containig MSAs
+	"""
+
+	msa = {}
+	with open (msa_file, 'r') as MSA_FILE:
+
+		loci = None
+
+		for i, line in enumerate(MSA_FILE):
+
+			line = line.strip()
+			if line == '':
+				continue
+	
+			split_line = line.split()
+
+			if split_line[0][0] == ">":
+				loci = split_line[0][1:].split(".")[0]
+				msa[loci] = []
+				continue
+			elif len(split_line) == 2:
+				loci = split_line[0]
+				line = split_line[1]
+
+			msa[loci].append(line.upper())
+
+	msa = {x:"".join(msa[x]) for x in list(msa.keys())}
+
+	return msa
