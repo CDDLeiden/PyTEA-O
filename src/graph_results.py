@@ -97,9 +97,6 @@ def __read_SE_data(SE_file:str=None) -> list:
 
 			msa_links[msa_pos] = pos
 
-			# print({x.split(":")[0]:int(x.split(":")[-1]) for x in consensus.split(";") if x.split(":")[0] != '-'})
-			# exit()
-
 			data[pos] = {
 				"RES":res,
 				"SE":abs(float(gE_i)),
@@ -254,14 +251,35 @@ def plot(data:dict=None,
 		current_row += 1
 		final_plot = descriptor_graph
 
-	## Load CSS colors for iterative coloring
-	colors = mcolors.XKCD_COLORS
-	color_keys = [
-		"aqua","blue","chartreuse","coral","crimson",
-		"darkgreen","fuchsia","goldenrod","indigo","navy",
-		"olive","orange","orangered","orchid","salmon",
-		"teal","tomato","yellowgreen","grey","khaki"
-	]
+	colors = {
+		"white":"ffffffff",
+		"maroon":"800000",
+		"brown":"9A6324",
+		"olive":"808000",
+		"teal":"469990",
+		"navy":"000075",
+		"red":"e6194B",
+		"orange":"f58231",
+		"yellow":"ffe119",
+		"lime":"bfef45",
+		"green":"3cb44b",
+		"cyan":"42d4f4",
+		"blue":"4363d8",
+		"purple":"911eb4",
+		"magenta":"f032e6",
+		"grey":"a9a9a9",
+		"pink":"fabed4",
+		"apricot":"ffd8b1",
+		"beige":"fffac8",
+		"mint":"aaffc3",
+		"lavender":"dcbeff",
+	}
+
+	color_keys = colors.keys()
+
+	custom_colors = [f"#{x}" for x in colors.values()]
+
+	cmap = mcolors.ListedColormap([f"#{x}" for x in colors.values()])
 
 	####################################################################################################################
 	## Shannon Entropy Graphing
@@ -272,7 +290,6 @@ def plot(data:dict=None,
 	ase_values = np.array([data[x]["ASE"] for x in res_nums])
 
 	# Residue and residue number labels
-	# labels = [f"{data[x]["RES"]} [{x+1}]" if x%2 != 0 else f"{data[x]["RES"]}" for x in res_nums]
 	labels = [f"{data[x]['RES']} [{x+1}]" if x%2 != 0 else f"{data[x]['RES']}" for x in res_nums]
 
 	if config["se_graphing"]:
@@ -304,11 +321,9 @@ def plot(data:dict=None,
 		se_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
 		se_graph.spines['bottom'].set_visible(False)
 
-		# ase_graph = se_graph.twinx()
-
-	# ####################################################################################################################
-	# ## Specificity/Conservation Scoring
-	# ####################################################################################################################
+	####################################################################################################################
+	## Specificity/Conservation Scoring
+	####################################################################################################################
 
 	rotate_deg = np.deg2rad(45)
 	sin_val = np.sin(rotate_deg)
@@ -323,7 +338,6 @@ def plot(data:dict=None,
 	spec_dist = np.sqrt(np.square(ase_values)+np.square(np.subtract(se_values,1)))
 
 	for index,x in enumerate(res_nums):
-		# scs_graph.plot(x,cons[index],markersize=5*(1-spec_dist[index]),marker='s',color='orange')
 		start_y = cons[index] if cons[index] < 0 else 0
 		length_y = abs(cons[index])
 		rect_width = 1-spec_dist[index]
@@ -331,9 +345,9 @@ def plot(data:dict=None,
 		if config["specificity_graphing"]:
 			scs_graph.add_patch(plt.Rectangle((rect_start,start_y),rect_width,length_y,facecolor='b',edgecolor='b'))
 
-	# ###########################################################
-	# ## Hightlight user-provided residues
-	# ###########################################################
+	###########################################################
+	## Hightlight user-provided residues
+	###########################################################
 	if highlights is not None:
 		rand_colors = sample(range(len(color_keys)),len(highlights.keys()))
 		for index,source in enumerate(highlights.keys()):
@@ -360,42 +374,33 @@ def plot(data:dict=None,
 		scs_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
 		scs_graph.set_ylim([-0.65,0.65])
 
-	# ####################################################################################################################
-	# ## Residue Presence Matrix
-	# ####################################################################################################################
+	####################################################################################################################
+	## Residue Presence Matrix
+	####################################################################################################################
 
 	## Get a positive/negative matrix of what residues are present in the MSA at each residue
 	present_res = np.zeros((len(aas),len(res_nums)))
 	for row_index,aa in enumerate(aas):
 		for col_index,val_x in enumerate(res_nums):
-			if aa in data[val_x]["RES_COUNTS"].keys():
-				present_res[row_index][col_index] = 1 if data[val_x]["RES_COUNTS"][aa] > 0 else 0
+			present_res[row_index][col_index] = row_index+1 if data[val_x]["RES_COUNTS"][aa] > 0 else 0
 
 	if config["residue_presence_matrix"]:
-		res_mat_graph.matshow(present_res,aspect='auto',cmap='tab20_r')
+		res_mat_graph.matshow(present_res,aspect='auto',cmap=cmap)
 
 		## Setup Y-Axis
 		res_mat_graph.set_yticks([i for i in range(len(aas))],labels=aas,font='monospace')
-		# res_mat_graph.yaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
 		res_mat_graph.yaxis.set_minor_locator(MultipleLocator(1))
 		res_mat_graph.yaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
 		res_mat_graph.tick_params(axis='y',which='minor',left=False)
 
 		## Setup X-Axis
-		# Set major tick for each residue [0 to pos-1]
-		# res_mat_graph.xaxis.set_ticks([i-1 for i in range(len(res_nums)+1)])
 		res_mat_graph.xaxis.set_ticks(range(len(res_nums)))
 		# Set and rotate major tick labels
-		# if res_mat_graph == first_plot:
-		# 	labels = [None for val_x in res_nums]
-		# else:
-		# 	labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
 		res_mat_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
 		# Show major tick labels, but not the ticks themselves, and only on the top
 		res_mat_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=True,labelbottom=False)
 
 		# Set minor ticks for each residue, but offset by -0.5 to create fake gridlines
-		# res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
 		res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1))
 		# Don't show any information regarding the minor ticks
 		res_mat_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
@@ -406,12 +411,10 @@ def plot(data:dict=None,
 
 		# Turn on X-axis gridlines using the minor ticks
 		res_mat_graph.xaxis.grid(color='w',linestyle='-',linewidth=0.75,which='minor')
-		# res_mat_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
-		# res_mat_graph.set_xlim([0,50])
 
-	# ####################################################################################################################
-	# ## Number of Residue Bar Graph
-	# ####################################################################################################################
+	####################################################################################################################
+	## Number of Residue Bar Graph
+	####################################################################################################################
 
 	if config["number_of_residues"]:
 		res_num_graph.bar(res_nums,num_ress,1)
@@ -427,7 +430,6 @@ def plot(data:dict=None,
 		res_num_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
 		res_num_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
 
-		# res_num_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
 		res_num_graph.xaxis.set_minor_locator(MultipleLocator(1))
 		res_num_graph.grid(color='gainsboro',linestyle='-',linewidth=0.75,which='minor')
 		res_num_graph.tick_params(axis='x',which='minor',top=False,bottom=False)
@@ -448,9 +450,9 @@ def plot(data:dict=None,
 		res_num_graph.spines['top'].set_visible(False)
 		res_num_graph.spines['bottom'].set_visible(False)
 	
-	# # ###################################################################################################################
-	# # ## Residue Distribution Bar Graph
-	# # ###################################################################################################################
+	###################################################################################################################
+	## Residue Distribution Bar Graph
+	###################################################################################################################
 
 	# TODO Add colorscheme here for residue classification (pos, neg, etc.)
 	# Stacking bars require a y-value to place the bottom of the bar
@@ -458,15 +460,13 @@ def plot(data:dict=None,
 	bottoms = np.zeros(len_of_seq)
 
 	if config["residue_distribution"]:
-		for i in range(len(aas)):
+		# Iterate over all amino acids
+		for i,aa in enumerate(aas[::-1]):
 			res_vals = np.zeros(len_of_seq)
+			# Iterate over each position in the sequence
 			for index,val_x in enumerate(res_nums):
-				if i < len(data[val_x]["RES_COUNTS"].keys()):
-					sorted_res_counts = sorted(data[val_x]["RES_COUNTS"].keys(),reverse=True,key=lambda x: data[val_x]["RES_COUNTS"][x])
-					res_vals[index] = data[val_x]["RES_COUNTS"][sorted_res_counts[i]]/num_of_seq if sorted_res_counts[i] != "-" else 0
-				else:
-					res_vals[index] = 0
-			res_dist_graph.bar(res_nums,res_vals,1,bottom=bottoms)
+				res_vals[index] = data[val_x]["RES_COUNTS"][aa]/num_of_seq
+			res_dist_graph.bar(res_nums,res_vals,1,bottom=bottoms,color=custom_colors[-1-i])
 			bottoms += res_vals
 
 		## Setup top X-Axis
@@ -475,7 +475,7 @@ def plot(data:dict=None,
 		res_dist_graph.xaxis.set_ticks([i for i in res_nums])
 		# Set and rotate major tick labels
 		res_dist_graph.set_xticklabels(labels=labels,rotation='vertical',fontsize=font_size,va='center',ha='center')
-		res_dist_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=False,labeltop=True)
+		res_dist_graph.tick_params(axis='x',which='major',top=False,bottom=False,labelbottom=True,labeltop=True)
 		res_dist_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
 		# res_dist_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
 		res_dist_graph.xaxis.set_minor_locator(MultipleLocator(1))
@@ -486,10 +486,11 @@ def plot(data:dict=None,
 		res_dist_graph.yaxis.set_ticklabels([0.0,0.2,0.4,0.6,0.8,1.0])
 
 		res_dist_graph.spines['top'].set_visible(False)
+		res_dist_graph.spines['bottom'].set_visible(False)
 
-	# # ###################################################################################################################
-	# # ## ZSCALES
-	# # ###################################################################################################################
+	###################################################################################################################
+	## ZSCALES
+	###################################################################################################################
 
 	if config["descriptor_distribution"]:
 
@@ -498,7 +499,7 @@ def plot(data:dict=None,
 		ylabels = list(data[val_x]["DESCRIPTORS"].keys())
 
 		# Store descriptors in matrix
-		m = np.zeros((len(ylabels), len(res_nums) +1))
+		m = np.zeros((len(ylabels), len(res_nums)))
 
 		for i,descr in enumerate(ylabels):
 			for index,val_x in enumerate(res_nums):
@@ -515,24 +516,16 @@ def plot(data:dict=None,
 		## Setup X-Axis
 		descriptor_graph.xaxis.set_ticks(range(len(res_nums)))
 		labels = [f"{val_x+1: >{len(str(len_of_seq))+1}}" if val_x%2 != 0 else "" for val_x in res_nums]
-		# print(labels)
-		# print(range(len(res_nums)))
-		# descriptor_graph.set_xlim([(res_nums[0]-0.5),res_nums[-1]+0.5])
-		# res_mat_graph.xaxis.set_minor_locator(MultipleLocator(1,offset=-0.5))
-		# descriptor_graph.xaxis.set_minor_locator(MultipleLocator(1))
 		
 		# Set and rotate major tick labels
 		descriptor_graph.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size,va='center',ha='center')
-		descriptor_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=False,labelbottom=False, pad=10)
-		descriptor_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False, pad=10)
+		descriptor_graph.tick_params(axis='x',which='major',top=False,bottom=False,labeltop=False,labelbottom=False)
+		descriptor_graph.tick_params(axis='x',which='minor',top=False,bottom=False,labeltop=False,labelbottom=False)
 
 		descriptor_graph.spines['bottom'].set_visible(False)
 		descriptor_graph.spines['top'].set_visible(False)
-		descriptor_graph.spines['left'].set_visible(False)
-		descriptor_graph.spines['right'].set_visible(False)
 
 	## Setup top and bottom X-Axis
-	# first_plot.set_xticks([])
 	axt = first_plot.secondary_xaxis('top')
 	axt.set_xticks(range(len(res_nums)))
 	axt.tick_params(which='both',top=False)
@@ -542,13 +535,12 @@ def plot(data:dict=None,
 	rdg_bt = final_plot.secondary_xaxis("bottom")
 	rdg_bt.set_xticks(range(len(res_nums)))
 	rdg_bt.tick_params(which='both',bottom=False)
-	# labels = [f"[{x+1}] {data[x]["CON_RES"]}" if x%2 != 0 else data[x]["CON_RES"] for x in res_nums]
 	labels = [f"[{x+1}] {data[x]['CON_RES']}" if x%2 != 0 else data[x]['CON_RES'] for x in res_nums]
 	rdg_bt.set_xticklabels(labels=labels,rotation='vertical',font='monospace',fontsize=font_size)
 
-	# # ###################################################################################################################
-	# # ## SAVING FILES
-	# # ###################################################################################################################
+	###################################################################################################################
+	## SAVING FILES
+	###################################################################################################################
 
 	fig.canvas.draw_idle()
 	plt.tight_layout()
