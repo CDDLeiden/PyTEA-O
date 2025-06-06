@@ -1,4 +1,4 @@
-# TEA
+# PyTEA-O
 
 This repository contains a re-implementation of a Two-Entropy Analysis (TEA) in Python as described in [*Ye et al., 2008*](https://pubmed.ncbi.nlm.nih.gov/18304936/) for protein sequence variation analysis.
 
