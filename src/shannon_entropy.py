@@ -277,7 +277,7 @@ def TEA(subfamilies_file:str,outdir:str,msa:pd.DataFrame,threads:int,mode:str,ms
 
 	temp_entropy_file_name = "intermediate_average_entropies.teao"
 	if mode == "TEAO":
-		subfamilies_file,_ = run_upgma(msa=msa,outdir=outdir)
+		subfamilies_file,_ = run_upgma(msa=msa,threads=threads,outdir=outdir)
 		temp_entropy_file_name = "intermediate_average_entropies.teao"
 	
 	## Default to TEA-O messages
@@ -285,7 +285,7 @@ def TEA(subfamilies_file:str,outdir:str,msa:pd.DataFrame,threads:int,mode:str,ms
 		print("\n\t\t\t[W] Subfamily definition file not provided, defaulting to TEA-O algorithm...")
 	if mode == "TEA" and not isfile(subfamilies_file):
 		print(f"\n\t\t\t[W] Subfamily definition file {subfamilies_file} not found, defaulting to TEA-O algorithm...")
-		subfamilies_file,_ = run_upgma(msa_file=msa_file,outdir=outdir)
+		subfamilies_file,_ = run_upgma(msa_file=msa_file,threads=threads,outdir=outdir)
 
 	subfamilies:dict = read_subfamilies(subfamilies_file)
 

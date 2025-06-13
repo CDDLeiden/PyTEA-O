@@ -57,7 +57,7 @@ def distance(sequence_a_loc:pd.DataFrame):
 
 	return [sequence_a_loc,distances]
 
-def calculate_sequence_difference(msa:pd.DataFrame,outfile:str) -> pd.DataFrame:
+def calculate_sequence_difference(msa:pd.DataFrame,threads:int,outfile:str) -> pd.DataFrame:
 
 	"""Calculates the distances between sequences in an MSA
 
@@ -81,7 +81,7 @@ def calculate_sequence_difference(msa:pd.DataFrame,outfile:str) -> pd.DataFrame:
 	start = time()
 
 	results:list
-	with mp.Pool(mp.cpu_count()) as executor:
+	with mp.Pool(threads) as executor:
 		results = executor.map(distance,keys)
 
 	print(f"\n\t\tDistance calculations took {int(time()-start)}s")
@@ -200,7 +200,7 @@ def pass_subfamilies_file_check(outfile:str,labels:list) -> bool:
 
 	return True
 
-def run(msa:str|pd.DataFrame,outdir:str) -> Tuple[str,str]:
+def run(msa:str|pd.DataFrame,threads:int,outdir:str) -> Tuple[str,str]:
 
 	start = time()
 	
@@ -219,7 +219,7 @@ def run(msa:str|pd.DataFrame,outdir:str) -> Tuple[str,str]:
 	makedirs(outdir,0o700,exist_ok=True)
 
 	## Create and fill initial distance matrix
-	distance_matrix:pd.DataFrame = calculate_sequence_difference(msa=msa,outfile=distance_file)
+	distance_matrix:pd.DataFrame = calculate_sequence_difference(msa=msa,threads=threads,outfile=distance_file)
 
 	## No re-runs
 	if pass_subfamilies_file_check(outfile=subfamilies_file,labels=sorted(msa.keys())): return subfamilies_file,distance_file
@@ -237,6 +237,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-m", "--msa_file", required=True)
 	parser.add_argument("-o","--outdir",default="UPGMA_SUBFAMILY_GROUPINGS")
+	parser.add_argument("-t","--threads",default=1)
 	args = parser.parse_args()
 
 	run(msa=args.msa_file,outdir=args.outdir)
