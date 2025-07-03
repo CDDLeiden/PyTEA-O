@@ -63,7 +63,7 @@ def __read_res_highlight_subset_file(file:str=None) -> dict:
 			if len(values) == 2:
 				for x in range(int(values[0]),int(values[1])+1):
 					if int(x) not in selection[source]:
-						selection[source].append(int(x))
+						selection[source].append(int(x)-1)
 			else:
 				if int(values[0]) not in selection[source]:
 					selection[source].append(int(values[0]))
@@ -277,7 +277,7 @@ def plot(data:dict=None,
 	ase_values = np.array([data[x]["ASE"] for x in res_nums])
 
 	# Residue and residue number labels
-	labels = [x if x%2 != 0 else "" for x in res_nums]
+	labels = [(x+1) if (x+1)%2 == 0 else "" for x in res_nums]
 
 	if config["se_graphing"]:
 		## Expand the graph slightly past the plotted data
