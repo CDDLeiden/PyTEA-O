@@ -576,16 +576,16 @@ def run(shannon_entropy_summary_file:str,
 
 if __name__ == "__main__":
 
-	GetOptions = ArgumentParser()
+	parser = ArgumentParser()
 
-	GetOptions.add_argument("-s","--shannon_entropy_summary_file",required=True,type=str)
-	GetOptions.add_argument("-o","--outdir",required=False,type=str,default="se_graphics")
-	GetOptions.add_argument("-y","--highlight_residue_file",required=False,type=str)
-	GetOptions.add_argument("-z","--descriptor_file",required=False,type=str)
-	GetOptions.add_argument("-f","--subset_file",required=False,type=parse_range,help="Select subset of residues to plot, like 1-100")
-	GetOptions.add_argument("-c","--configuration_file",required=False,type=str)
+	parser.add_argument("-s","--shannon_entropy_summary_file",required=True,type=str)
+	parser.add_argument("-o","--outdir",required=False,type=str,default="se_graphics")
+	parser.add_argument("-y","--highlight_residue_file",required=False,type=str)
+	parser.add_argument("-z","--descriptor_file",required=False,type=str)
+	parser.add_argument("-f","--subset_file",required=False,type=parse_range,help="Select subset of residues to plot, like 1-100")
+	parser.add_argument("-c","--configuration_file",required=False,type=str)
 
-	args=GetOptions.parse_known_args()[0]
+	args=parser.parse_known_args()[0]
 
 	run(
 		shannon_entropy_summary_file=args.shannon_entropy_summary_file,

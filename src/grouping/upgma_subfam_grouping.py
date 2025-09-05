@@ -7,24 +7,14 @@ import argparse
 import numpy as np
 import pandas as pd
 from time import time
-from convert_alignment import read_MSA
+from src.utils.msa import read_MSA, load_msa
 from warnings import simplefilter
 import gc
 from typing import Tuple
-from utils import load_msa
+from src.utils.multiprocess import get_multiprocessing_module
+mp = get_multiprocessing_module()
 
 simplefilter(action='ignore',category=pd.errors.PerformanceWarning)
-
-## MacOS (darwin) utilizes a different multiprocessing library than Linux and Windows. Need to check which OS
-## OS is running to prevent SNAFUs
-multiprocessing = None
-if 'linux' in sys.platform:
-	multiprocessing = 'multiprocessing'
-elif 'darwin' in sys.platform:
-	multiprocessing = 'multiprocess'
-elif 'win' in sys.platform:
-	multiprocessing = 'multiprocessing'
-mp = __import__(multiprocessing)
 
 def generate_distance_matrix(msa:pd.DataFrame) -> pd.DataFrame:
 

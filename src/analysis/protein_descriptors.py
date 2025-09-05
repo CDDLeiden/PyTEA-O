@@ -112,13 +112,13 @@ if __name__ == "__main__":
 	from argparse import ArgumentParser
 	from os.path import dirname,abspath
 
-	GetOptions = ArgumentParser()
+	parser = ArgumentParser()
 
-	GetOptions.add_argument("-o","--outdir",required=False,type=str,default="zscales")
-	GetOptions.add_argument("-d","--descriptor_file",required=False,default=f"{dirname(abspath(__file__))}/../DB_files/ZscaleSandberg.txt")
-	GetOptions.add_argument("-s","--summary_file",required=True,default=None,type=str,help="shannon_entropy.summary file")
+	parser.add_argument("-o","--outdir",required=False,type=str,default="zscales")
+	parser.add_argument("-d","--descriptor_file",required=False,default=f"{dirname(abspath(__file__))}/../DB_files/ZscaleSandberg.txt")
+	parser.add_argument("-s","--summary_file",required=True,default=None,type=str,help="shannon_entropy.summary file")
 
-	args = GetOptions.parse_known_args()[0]
+	args = parser.parse_known_args()[0]
 	
 	run(descriptor_file=args.descriptor_file, 
 		summary_file=args.summary_file, 

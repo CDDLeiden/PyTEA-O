@@ -466,15 +466,15 @@ if __name__ == "__main__":
 
 	from argparse import ArgumentParser
 
-	GetOptions = ArgumentParser()
+	parser = ArgumentParser()
 
-	GetOptions.add_argument(
+	parser.add_argument(
 					"-m","--msa",
 					required=True,
 					help="Path to MSA-file containing accessions to group by taxonomy."
 	)
 
-	GetOptions.add_argument(
+	parser.add_argument(
 					"-s","--chunk_size",
 					required=False,
 					type=int,
@@ -482,24 +482,24 @@ if __name__ == "__main__":
 					help="Size of file chunks in megabases (Mb) [Default: 5Mb]"
 	)
 	
-	GetOptions.add_argument(
+	parser.add_argument(
 					"-n","--num_chunks",
 					required=False,
 					type=int,
 					default=10
 	)
 
-	GetOptions.add_argument(
+	parser.add_argument(
 					"-t","--threads",
 					required=False,
 					type=int,
 					default=2
 	)
 
-	GetOptions.add_argument(
+	parser.add_argument(
 					"-o","--outdir",
 					type=str,
 					default="TaxonomyGrouping"
 	)
 
-	main(args=GetOptions.parse_known_args()[0])
+	main(args=parser.parse_known_args()[0])
