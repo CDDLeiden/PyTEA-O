@@ -237,7 +237,7 @@ if __name__ == '__main__':
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-m", "--msa_file", required=True)
 	parser.add_argument("-o","--outdir",default="UPGMA_SUBFAMILY_GROUPINGS")
-	parser.add_argument("-t","--threads",default=1)
+	parser.add_argument("-t","--threads",default=1,type=int,required=False)
 	args = parser.parse_args()
 
-	run(msa=args.msa_file,outdir=args.outdir)
+	run(msa=args.msa_file,threads=args.threads,outdir=args.outdir)
