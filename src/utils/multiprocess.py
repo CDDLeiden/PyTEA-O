@@ -1,6 +1,5 @@
 import sys
 import importlib
-from src.io.output import write_shannon_entropy_temp_results
 
 def get_multiprocessing_module():
 	if 'darwin' in sys.platform:
