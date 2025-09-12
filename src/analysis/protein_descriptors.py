@@ -5,27 +5,8 @@ import sys
 import numpy as np
 import pandas as pd
 
-
-def get_file_name(file:str) -> str:
-	"""
-	Get the file name from the path without the extension
-	"""
-	if "/" in file:
-		file = file.split("/")[-1]
-	if "\\" in file:
-		file = file.split("\\")[-1]
-	if "." in file:
-		file = file.split(".")[0]
-	return file
-
-
-def load_descriptors(descriptor_file:str) -> dict:
-	"""
-	Read descriptor values from file
-	"""
-	descriptors = pd.read_csv(descriptor_file, delim_whitespace=True, header=0, index_col=0).to_dict(orient='index')
-	return descriptors
-
+from src.utils.general import get_file_name
+from src.utils.sequence import SequenceUtilities
 
 def load_residue_counts(summary_file:str) -> dict:
 
@@ -99,8 +80,9 @@ def run(descriptor_file:str,summary_file:str,outdir:str) -> None:
 	if not os.path.exists(outdir):
 		os.makedirs(outdir)
 
-	descriptors = load_descriptors(descriptor_file=descriptor_file)
+	descriptors = SequenceUtilities.Sandberg_Zscales
 	res_counts = load_residue_counts(summary_file=summary_file)
+	exit()
 
 	desc_name = get_file_name(descriptor_file)
 	outfile = f"{outdir}/prot_descriptors_{desc_name}.tsv"
