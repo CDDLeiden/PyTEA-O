@@ -1,4 +1,4 @@
-name: TEAenv
+name: TEAO
 channels:
   - defaults
   - conda-forge
