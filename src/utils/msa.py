@@ -7,15 +7,11 @@ import pathlib
 import collections
 import typing
 
-from src.utils.sequence import SequenceUtilities
-from src.utils.general import create_directory, get_file_name
-from src.utils.multiprocess import get_multiprocessing_module
-
-mp = get_multiprocessing_module()
+from src.utils.multiprocess import Pool
 
 class MSA:
 
-	char_to_int = {
+	_CHAR_TO_INT = {
 		'-':0,
 		'A':1,
 		'B':2,
@@ -42,7 +38,7 @@ class MSA:
 		'Z':23
 	}
 
-	int_to_char = {
+	_INT_TO_CHAR = {
 		0:'-',
 		1:'A',
 		2:'B',
@@ -69,18 +65,23 @@ class MSA:
 		23:'Z'
 	}
 
-	def __init__(self, msa_file:pathlib.Path, outdir:pathlib.Path):
+	def __init__(self, msa_file:pathlib.Path, outdir:pathlib.Path,threads:int=1):
 
 		self.msa_file:pathlib.Path = msa_file
 		self.outdir:pathlib.Path = outdir
+		self.threads:int = threads
 
-		self._load_msa(msa_file=self.msa_file)
+		self.__load_msa(msa_file=self.msa_file)
 
+		self.shape = self.msa.shape
 		self.sequence_length,self.num_sequences = self.msa.shape
 		self.accessions = self.msa.columns
+		
+		self.__residue_counts = None
+		self.__distance_matrix = None
 
 
-	def _load_msa(self,msa_file:pathlib.Path,outdir:pathlib.Path=pathlib.Path('./')) -> pd.DataFrame:
+	def __load_msa(self,msa_file:pathlib.Path,outdir:pathlib.Path=pathlib.Path('./')) -> None:
 
 		"""
 		Reads an MSA from a given file and converts it to a pandas.DataFrame object, where each column is sequence, and each
@@ -125,7 +126,7 @@ class MSA:
 			print(f"\n\t[N]  Terminating Two-Entropy calculations.")
 			exit()
 
-		self.msa = pd.DataFrame({x:[self.char_to_int[y] for y in msa[x]] for x in msa.keys()})
+		self.msa = pd.DataFrame({x:[self._CHAR_TO_INT[y] for y in msa[x]] for x in msa.keys()})
 
 	def get_reference_indices(self,ref:str) -> np.array:
 
@@ -148,7 +149,8 @@ class MSA:
 
 		return msa.index[msa[ref]!=0]
 
-	def get_residue_counts(self) -> pd.DataFrame:
+	@classmethod
+	def get_residue_counts(cls,msa:pd.DataFrame) -> pd.DataFrame:
 
 		"""
 		Returns the counts of all the different residues present in all sequences at the i-th index, for all index in the MSA.
@@ -160,22 +162,22 @@ class MSA:
 		pandas.DataFrame: Sum of residue counts across all sequences for each column (size = AA[24] x MSA_Length)
 		"""
 
-		msa = self.msa
-
 		def count_residues(row) -> dict:
 
-			counts = collections.Counter([item for item in row if item in self.int_to_char.keys()])
+			counts = collections.Counter([item for item in row if item in cls._INT_TO_CHAR.keys()])
 
-			return {numeric: counts.get(numeric, 0) for numeric in self.int_to_char.keys()}
+			return {numeric: counts.get(numeric, 0) for numeric in cls._INT_TO_CHAR.keys()}
 
 		## Get residue counts 
 		msa_residue_counts = msa.apply(count_residues,axis=1,result_type='expand')
 
-		msa_residue_counts =  pd.DataFrame((msa_residue_counts)).fillna(0).astype(int)
+		msa_df = pd.DataFrame((msa_residue_counts)).fillna(0).astype(int)
 
-		return msa_residue_counts
+		msa_df.columns = [cls._INT_TO_CHAR[x] for x in msa_df.columns]
 
-	def _calculate_distances(self,sequence_a_loc:str) -> typing.Tuple[str,dict]:
+		return msa_df
+
+	def __calculate_distances(self,sequence_a_loc:str) -> typing.Tuple[str,dict]:
 
 		sequence_a = self.msa[sequence_a_loc]
 
@@ -183,33 +185,41 @@ class MSA:
 
 		for sequence_b_loc in sorted(distances.keys()):
 			if sequence_b_loc == sequence_a_loc:
-				distances[sequence_b_loc] = np.inf
+				distances[sequence_b_loc] = 0
 				return sequence_a_loc,distances
 			distances[sequence_b_loc] = np.sum(sequence_a!=self.msa[sequence_b_loc])/2
 
 		return sequence_a_loc,distances
 
-	def calculate_sequence_difference(self,threads:int=1) -> pd.DataFrame:
-
-		"""Calculates the distances between sequences in an MSA
-
-		Returns:
-		"""
+	def __calculate_sequence_difference(self) -> pd.DataFrame:
 
 		keys:list = sorted(self.accessions)
-		self.distance_matrix:pd.DataFrame = pd.DataFrame(np.zeros([len(keys),len(keys)]),columns=keys,index=keys)
 
+		distance_matrix:pd.DataFrame = pd.DataFrame(np.zeros([len(keys),len(keys)]),columns=keys,index=keys)
 
 		results:list
-		with mp.Pool(threads) as executor:
-			results = executor.map(self._calculate_distances,keys)
+		with Pool(self.threads) as executor:
+			results = executor.map(self.__calculate_distances,keys)
 
 		for sequence_loc_a,result in results:
-			self.distance_matrix.loc[sequence_loc_a] = result
+			distance_matrix.loc[sequence_loc_a] = result
 
-		self.distance_matrix += self.distance_matrix.T
+		distance_matrix += distance_matrix.T
 
-		return self.distance_matrix
+		return distance_matrix
+
+	@property
+	def distance_matrix(self) -> pd.DataFrame:
+		if self.__distance_matrix is None:
+			self.__distance_matrix = self.__calculate_sequence_difference()
+		return self.__distance_matrix
+	
+	@property
+	def residue_counts(self) -> pd.DataFrame:
+		if self.__residue_counts is None:
+			self.__residue_counts = self.get_residue_counts(msa=self.msa)
+		return self.__residue_counts
+
 
 	# def to_one_liner(aligned_sequences:dict,output:str,reference:str) -> None:
 
