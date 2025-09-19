@@ -149,8 +149,7 @@ class MSA:
 
 		return msa.index[msa[ref]!=0]
 
-	@classmethod
-	def get_residue_counts(cls,msa:pd.DataFrame) -> pd.DataFrame:
+	def get_residue_counts(self,accessions:list) -> pd.DataFrame:
 
 		"""
 		Returns the counts of all the different residues present in all sequences at the i-th index, for all index in the MSA.
@@ -162,18 +161,20 @@ class MSA:
 		pandas.DataFrame: Sum of residue counts across all sequences for each column (size = AA[24] x MSA_Length)
 		"""
 
-		def count_residues(row) -> dict:
+		def __count_residues(row) -> dict:
 
-			counts = collections.Counter([item for item in row if item in cls._INT_TO_CHAR.keys()])
+			counts = collections.Counter([item for item in row if item in self._INT_TO_CHAR.keys()])
 
-			return {numeric: counts.get(numeric, 0) for numeric in cls._INT_TO_CHAR.keys()}
+			return {numeric: counts.get(numeric, 0) for numeric in self._INT_TO_CHAR.keys()}
+		
+		msa:pd.DataFrame = self.msa[accessions]
 
 		## Get residue counts 
-		msa_residue_counts = msa.apply(count_residues,axis=1,result_type='expand')
+		msa_residue_counts = msa.apply(__count_residues,axis=1,result_type='expand')
 
 		msa_df = pd.DataFrame((msa_residue_counts)).fillna(0).astype(int)
 
-		msa_df.columns = [cls._INT_TO_CHAR[x] for x in msa_df.columns]
+		msa_df.columns = [self._INT_TO_CHAR[x] for x in msa_df.columns]
 
 		return msa_df
 
@@ -217,7 +218,7 @@ class MSA:
 	@property
 	def residue_counts(self) -> pd.DataFrame:
 		if self.__residue_counts is None:
-			self.__residue_counts = self.get_residue_counts(msa=self.msa)
+			self.__residue_counts = self.get_residue_counts(accessions=self.msa.columns)
 		return self.__residue_counts
 
 
