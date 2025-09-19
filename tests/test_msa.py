@@ -14,7 +14,7 @@ def temp_outdir():
 	return 'temp'
 
 def create_MSA_object():
-	return MSA(msa_file=pathlib.Path(__file__).parent/'data'/'test.fasta.aligned',outdir='temp')
+	return MSA(msa_file=pathlib.Path(__file__).parent/'data'/'test.fasta.aligned',outdir='temp',threads=2)
 
 def test_MSA_creation(test_file_path,temp_outdir):
 	
@@ -33,7 +33,7 @@ def test_sequence_encoding():
 
 	actual_sequence = msa['seq3'].to_list()
 
-	expected_sequence = [msa_object.char_to_int[x] for x in "ACDE-E"]
+	expected_sequence = [msa_object._CHAR_TO_INT[x] for x in "ACDE-E"]
 
 	assert actual_sequence == expected_sequence
 
@@ -50,40 +50,40 @@ def test_get_residue_counts():
 	msa_object = create_MSA_object()
 
 	test_counts = {
-		0: {i: 0 for i in range(24)},
-		1: {i: 0 for i in range(24)},
-		2: {i: 0 for i in range(24)},
-		3: {i: 0 for i in range(24)},
-		4: {i: 0 for i in range(24)},
-		5: {i: 0 for i in range(24)},
+		0: {MSA._INT_TO_CHAR[i]: 0 for i in range(24)},
+		1: {MSA._INT_TO_CHAR[i]: 0 for i in range(24)},
+		2: {MSA._INT_TO_CHAR[i]: 0 for i in range(24)},
+		3: {MSA._INT_TO_CHAR[i]: 0 for i in range(24)},
+		4: {MSA._INT_TO_CHAR[i]: 0 for i in range(24)},
+		5: {MSA._INT_TO_CHAR[i]: 0 for i in range(24)},
 	}
 
 	# Manually filling in the correct counts
-	test_counts[0][1] = 5
+	test_counts[0]['A'] = 5
 	
-	test_counts[1][3] = 3
-	test_counts[1][5] = 1
-	test_counts[1][6] = 1
+	test_counts[1]['C'] = 3
+	test_counts[1]['E'] = 1
+	test_counts[1]['F'] = 1
 	
-	test_counts[2][0] = 1
-	test_counts[2][3] = 1
-	test_counts[2][4] = 2
-	test_counts[2][5] = 1
+	test_counts[2]['-'] = 1
+	test_counts[2]['C'] = 1
+	test_counts[2]['D'] = 2
+	test_counts[2]['E'] = 1
 	
-	test_counts[3][5] = 5
+	test_counts[3]['E'] = 5
 	
-	test_counts[4][0] = 1
-	test_counts[4][1] = 1
-	test_counts[4][6] = 3
+	test_counts[4]['-'] = 1
+	test_counts[4]['A'] = 1
+	test_counts[4]['F'] = 3
 	
-	test_counts[5][1] = 1
-	test_counts[5][3] = 1
-	test_counts[5][5] = 1
-	test_counts[5][6] = 1
-	test_counts[5][7] = 1
+	test_counts[5]['A'] = 1
+	test_counts[5]['C'] = 1
+	test_counts[5]['E'] = 1
+	test_counts[5]['F'] = 1
+	test_counts[5]['G'] = 1
 
 	test_counts = pd.DataFrame.from_dict(test_counts,orient='index')
-	msa_counts = msa_object.get_residue_counts()
+	msa_counts = msa_object.residue_counts
 
 	test_index = test_counts.index.to_list()
 	msa_index = msa_counts.index.to_list()
@@ -97,7 +97,6 @@ def test_get_residue_counts():
 	
 	identical_rows = 0
 	for column in test_columns:
-		letter = msa_object.int_to_char[column]
 		test_data = test_counts[column].to_numpy()
 		msa_data = msa_counts[column].to_numpy()
 		if np.array_equal(test_data,msa_data): identical_rows += 1
@@ -119,6 +118,6 @@ def test_calculate_sequence_difference():
 
 	expected_distances = pd.DataFrame(expected_distances,columns=msa_object.accessions,index=msa_object.accessions)
 
-	actual_distances = msa_object.calculate_sequence_difference(threads=2)
+	actual_distances = msa_object.distance_matrix
 
 	assert np.array_equal(expected_distances.to_numpy(),actual_distances.to_numpy())
