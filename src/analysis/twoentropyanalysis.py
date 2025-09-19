@@ -8,7 +8,7 @@ import heapq
 import pathlib
 
 from src.utils.msa import MSA
-from src.analysis.phylo_tree import PhyloTree
+from src.analysis.phylotree import PhyloTree
 from src.utils.general import valid_directory
 
 class TwoEntropyAnalysis:
