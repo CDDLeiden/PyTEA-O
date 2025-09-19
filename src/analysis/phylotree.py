@@ -8,12 +8,12 @@ class PhyloTree:
 
 	class __Node:
 
-		def __init__(self,node_id:int,accessions:list,branch_length:float):
+		def __init__(self,node_id:int,accessions:list,node_placement:float):
 
 			self.node_id:int = node_id
 			self.accessions:list = accessions
-			self.branch_length:float = branch_length
-			self.children:list = []
+			self.node_placement:float = node_placement
+			self.children:list[int] = []
 			self.parent:PhyloTree.__Node = None
 
 
@@ -22,32 +22,34 @@ class PhyloTree:
 		self.nodes:dict = {}
 		self.distance_matrix = msa.distance_matrix
 		self.next_node_id = 2*self.distance_matrix.shape[0]-2
-		self.__root = None
 		self.threads = threads
+		self.root = self.__upgma()
+		
+		self.__nodes_by_distance = None
 
-	def __add_node(self,accessions,branch_length) -> __Node:
+	def __add_node(self,accessions,node_placement) -> __Node:
 
 		node = self.nodes[self.next_node_id] = self.__Node(
 											node_id=self.next_node_id,
 											accessions=accessions,
-											branch_length=branch_length
+											node_placement=node_placement
 										)
 		
 		self.next_node_id -= 1
 
 		return node
 
-	def __join_nodes(self,node_1,node_2,branch_length) -> __Node:
+	def __join_nodes(self,node_1:__Node,node_2:__Node,node_placement) -> __Node:
 
 		new_node = self.__add_node(
 			accessions=node_1.accessions+node_2.accessions,
-			branch_length=branch_length
+			node_placement=node_placement
 		)
 		
-		new_node.children = [node_1,node_2]
+		new_node.children = [node_1.node_id,node_2.node_id]
 
-		node_1.parent = new_node
-		node_2.parent = new_node
+		node_1.parent = new_node.node_id
+		node_2.parent = new_node.node_id
 
 		return new_node
 	
@@ -66,7 +68,7 @@ class PhyloTree:
 		accession_to_nodeid:dict[str,int] = {}
 
 		for accession in accessions:
-			leaf:PhyloTree.__Node = self.__add_node(accessions=[accession],branch_length=0)
+			leaf:PhyloTree.__Node = self.__add_node(accessions=[accession],node_placement=0)
 			active_nodes[leaf.node_id] = leaf
 			accession_to_nodeid[accession] = leaf.node_id
 
@@ -141,9 +143,54 @@ class PhyloTree:
 				heapq.heappush(heap,(new_node_dist,new_node_id,id))
 
 		return next(iter(active_nodes.values()))
+	
+	def __get_nodes_by_distance(self) -> dict:
 
+		root:PhyloTree.__Node = self.root
+		root_id:int = root.node_id
+		root_placement:float = root.node_placement
+		
+		num_of_leafs:int = len(self.distance_matrix.columns)
+		
+		distances:dict = {}
+		active_nodes:dict[int:PhyloTree.__Node] = {root_id:root}
+
+		heap = []
+		heapq.heappush(heap,(0,root_id))
+
+		parent_node_placement:float
+		parent_node_id:int
+
+		while len(active_nodes) < num_of_leafs-1:
+
+			parent_node_placement,parent_node_id = heapq.heappop(heap)
+
+			parent_node:PhyloTree.__Node = self.nodes[parent_node_id]
+
+			child_node_id:int
+
+			for child_node_id in parent_node.children:
+
+				child_node:PhyloTree.__Node = self.nodes[child_node_id]
+
+				## Traversing tree in reverse, need to invert node_placement by root_placement
+				child_node_placement = root_placement - child_node.node_placement
+
+				## Add the new child nodes to active nodes
+				active_nodes[child_node_id] = child_node
+
+				heapq.heappush(heap,(child_node_placement,child_node_id))
+
+			## Parent node no longer present
+			del(active_nodes[parent_node_id])
+
+			## Track which nodes are at current placement
+			distances[abs(parent_node_placement-root_placement)] = list(active_nodes.keys())
+
+		return distances
+	
 	@property
-	def root(self):
-		if self.__root is None:
-			self.__root = self.__upgma()
-		return self.__root
+	def nodes_by_distance(self):
+		if self.__nodes_by_distance is None:
+			self.__nodes_by_distance = self.__get_nodes_by_distance()
+		return self.__nodes_by_distance
