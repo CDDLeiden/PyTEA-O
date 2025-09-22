@@ -1,6 +1,7 @@
 import os
 import time
 import textwrap
+import xarray as xr
 import pandas as pd
 import numpy as np
 import pathlib
@@ -8,6 +9,7 @@ import collections
 import typing
 
 from src.utils.multiprocess import Pool
+import src.utils.sequence as Sequence
 
 class MSA:
 
@@ -79,6 +81,7 @@ class MSA:
 		
 		self.__residue_counts = None
 		self.__distance_matrix = None
+		self.__descriptor_deviation = None
 
 
 	def __load_msa(self,msa_file:pathlib.Path,outdir:pathlib.Path=pathlib.Path('./')) -> None:
@@ -208,6 +211,34 @@ class MSA:
 		distance_matrix += distance_matrix.T
 
 		return distance_matrix
+	
+	def __apply_sequence_descriptors(self):
+
+		## WxR matrix
+		descriptors:pd.DataFrame = pd.DataFrame.from_dict(Sequence.SequenceUtilities.Sandberg_Zscales)
+
+		## PxR
+		residue_counts:pd.DataFrame = self.residue_counts[self.residue_counts.columns.intersection(descriptors.columns)]
+
+		## 1xRxW
+		weights = descriptors.values.T[np.newaxis:,:]
+		## PxRx1
+		counts = residue_counts.values[:,:,np.newaxis]
+
+		## Px1
+		total_res = residue_counts.sum(axis=1).values[:,np.newaxis]
+
+		## Px3
+		weighted_mean = np.sum(counts*weights,axis=1)/total_res
+
+		diff_squared = (weights[np.newaxis,:,:]-weighted_mean[:,np.newaxis,:])**2
+		weighted_variance = np.sum(counts*diff_squared,axis=1)/total_res
+
+		standard_dev = np.sqrt(weighted_variance)
+
+		normalized_dev = pd.DataFrame(standard_dev/np.max(standard_dev),columns=descriptors.columns)
+
+		return normalized_dev
 
 	@property
 	def distance_matrix(self) -> pd.DataFrame:
@@ -221,55 +252,8 @@ class MSA:
 			self.__residue_counts = self.get_residue_counts(accessions=self.msa.columns)
 		return self.__residue_counts
 
-
-	# def to_one_liner(aligned_sequences:dict,output:str,reference:str) -> None:
-
-	# 	with open(output,'w') as OUT:
-
-	# 		if reference:
-
-	# 			OUT.write(f">{reference}\n{aligned_sequences[reference]}\n")
-
-	# 		for sequence in sorted(aligned_sequences.keys()):
-
-	# 			if sequence == "reference":
-	# 				next
-
-	# 			OUT.write(f">{sequence}\n{aligned_sequences[sequence]}\n")
-
-	# 	return None
-
-	# def extract(aligned_sequences:dict,outdir=str) -> None:
-
-	# 	fasta_dir = f"{outdir}/FASTAs" 
-	# 	create_directory(f"{outdir}/FASTAs")
-
-	# 	for locus in aligned_sequences.keys():
-
-	# 		with open(f"{fasta_dir}/{locus}.fasta",'w') as FASTA:
-
-	# 			sequence = "\n".join(textwrap.wrap(aligned_sequences[locus].replace("-",""),60))
-
-	# 			FASTA.write(f">{locus}\n{sequence}\n")
-
-	# 	return None
-
-	# def convert(self,aligned_sequences:dict,align_type:str,outdir:str,file_prefix:str,reference:str) -> None:
-
-	# 	if reference and reference not in aligned_sequences.keys():
-
-	# 		print(f"\n[W]  Reference locus - {reference} - was not found in the alignment set. Defaulting to normal functionality.\n")
-
-	# 		reference = None
-
-	# 	if align_type == "one_liner":
-			
-	# 		self.to_one_liner(aligned_sequences=aligned_sequences,output=f"{outdir}/{file_prefix}.ola",reference=reference)
-		
-	# 	if align_type == "clustal":
-	# 		...
-		
-	# 	if align_type == "fasta":
-	# 		...
-
-	# 	return
+	@property
+	def descriptor_deviation(self) -> pd.DataFrame:
+		if self.__descriptor_deviation is None:
+			self.__descriptor_deviation = self.__apply_sequence_descriptors()
+		return self.__descriptor_deviation
