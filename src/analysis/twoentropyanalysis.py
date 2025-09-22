@@ -13,7 +13,7 @@ from src.utils.general import valid_directory
 
 class TwoEntropyAnalysis:
 
-	def __init__(self,msa:MSA,tree:PhyloTree,threads:int=1,outdir:str="./TEA"):
+	def __init__(self,msa:MSA,tree:PhyloTree,threads:int=1,outdir:str|pathlib.Path=pathlib.Path("./TEA").resolve(strict=False)):
 
 		self.msa = msa
 		self.tree = tree
@@ -104,47 +104,6 @@ class TwoEntropyAnalysis:
 			nodal_entropy[node_id] = self.__calculate_shannon_entropy(node_id)
 
 		return nodal_entropy
-	
-	# def summarize_TEA_results(self,reference_accession:str|None=None) -> None:
-
-	# 	if reference_accession is None:
-	# 		reference_accession = self.msa.msa.columns[0]
-
-	# 	outfile:pathlib.Path = self.outdir / "two_entropy.summary"
-
-	# 	reference_seq_to_msa_indexes:np.array = self.msa.get_reference_indices(reference_accession)
-	# 	consensus_sequence:pd = self.msa.get_residue_counts(self.msa.msa.columns)
-
-	# 	with outfile.open('w') as OUT:
-
-	# 		OUT.write(f"## Sequence_Pos\tMSA_Pos\tResidue\tGlobal_Shannon_Entropy\tAverage_Shannon_Entropy\tSequences_at_pos\tNum_of_gaps\n")
-
-	# 		for res_index,msa_index in enumerate(reference_seq_to_msa_indexes):
-				
-	# 			global_entropy = self.global_entropy[msa_index]
-	# 			average_entropy = self.average_entropy[msa_index]
-	# 			num_of_gaps = consensus_sequence['-'][msa_index]
-	# 			non_gapped_res = len(self.msa.msa.columns)
-
-	# 			## Residue index
-	# 			OUT.write(f"{res_index}")
-	# 			## MSA index
-	# 			OUT.write(f"\t{msa_index}")
-	# 			## Global entropy
-	# 			OUT.write(f"\t{global_entropy}")
-	# 			## Average entropy
-	# 			OUT.write(f"\t{average_entropy}")
-	# 			## Residue of reference
-	# 			# OUT.write(f"\t{SequenceUtilities.AAs[np.where(msa.loc[reference_id,'array'].T[msa_index]==1)[0][0]]}")
-	# 			## Consenus
-	# 			# residue_count = ";".join([f"{residue}:{int(count)}" for count,residue in sorted(list(zip(np.sum(msa.loc[msa.index,'array'],axis=0).T[msa_index],SequenceUtilities.AAs)),key=lambda x: x[0],reverse=True)])
-	# 			# OUT.write(f"\t{residue_count}")
-	# 			## Non-gapped residues
-	# 			OUT.write(f"\t{non_gapped_res}")
-	# 			## Gapped residues
-	# 			OUT.write(f"\t{num_of_gaps}\n")
-
-	# 	return None
 
 	@property
 	def global_entropy(self):
