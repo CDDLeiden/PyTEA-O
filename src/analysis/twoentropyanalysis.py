@@ -15,12 +15,14 @@ class TwoEntropyAnalysis:
 
 	def __init__(self,msa:MSA,tree:PhyloTree,threads:int=1,outdir:str|pathlib.Path=pathlib.Path("./TEA").resolve(strict=False)):
 
-		self.msa = msa
-		self.tree = tree
+		self.msa:MSA = msa
+		self.tree:PhyloTree = tree
 		self.threads = threads
 		self.outdir = valid_directory(outdir)
 		self.__average_entropy = None
 		self.__global_entropy = None
+		self.__conservation_scores = None
+		self.__specificity_scores = None
 
 	def __calculate_shannon_entropy(self,node_id:int,weigh:bool=True):
 
@@ -105,6 +107,14 @@ class TwoEntropyAnalysis:
 
 		return nodal_entropy
 
+	def __calculate_conservation_scores(self):
+
+		return -np.sqrt(np.square(self.average_entropy)+np.square(self.global_entropy))+0.5
+	
+	def __calculate_specificity_scores(self):
+
+		return -np.sqrt(np.square(self.average_entropy)+np.square(self.global_entropy-1))+0.5
+
 	@property
 	def global_entropy(self):
 		if self.__global_entropy is None:
@@ -116,3 +126,15 @@ class TwoEntropyAnalysis:
 		if self.__average_entropy is None:
 			self.__average_entropy = self.__calculate_average_entropy()
 		return self.__average_entropy
+	
+	@property
+	def conservation_scores(self):
+		if self.__conservation_scores is None:
+			self.__conservation_scores = self.__calculate_conservation_scores()
+		return self.__conservation_scores
+
+	@property
+	def specificity_scores(self):
+		if self.__specificity_scores is None:
+			self.__specificity_scores = self.__calculate_specificity_scores()
+		return self.__specificity_scores
