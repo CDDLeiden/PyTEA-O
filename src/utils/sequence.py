@@ -4,6 +4,8 @@ class SequenceUtilities:
 
 	AAs = ['A','B','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y','X','Z','-']
 
+	Natural_AAs = ['A','C','D','E','F','G','H','I','K','L','M','N','P','Q','R','S','T','V','W','Y']
+
 	aa_to_codon = {
 		'A': ['GCT', 'GCC', 'GCA', 'GCG'],       # Alanine
 		'R': ['CGT', 'CGC', 'CGA', 'CGG', 'AGA', 'AGG'],  # Arginine
@@ -53,26 +55,29 @@ class SequenceUtilities:
 	}
 
 	Sandberg_Zscales = {
-		'A': {'Zscale_1': 0.24, 'Zscale_2': -2.32, 'Zscale_3': 0.6},
-		'C': {'Zscale_1': 0.84, 'Zscale_2': -1.67, 'Zscale_3': 3.71},
-		'D': {'Zscale_1': 3.98, 'Zscale_2': 0.93, 'Zscale_3': 1.93},
-		'E': {'Zscale_1': 3.11, 'Zscale_2': 0.26, 'Zscale_3': -0.11},
-		'F': {'Zscale_1': -4.22, 'Zscale_2': 1.94, 'Zscale_3': 1.06},
-		'G': {'Zscale_1': 2.05, 'Zscale_2': -4.06, 'Zscale_3': 0.36},
-		'H': {'Zscale_1': 2.47, 'Zscale_2': 1.95, 'Zscale_3': 0.26},
-		'I': {'Zscale_1': -3.89, 'Zscale_2': -1.73, 'Zscale_3': -1.71},
-		'K': {'Zscale_1': 2.29, 'Zscale_2': 0.89, 'Zscale_3': -2.49},
-		'L': {'Zscale_1': -4.28, 'Zscale_2': -1.3, 'Zscale_3': -1.49},
-		'M': {'Zscale_1': -2.85, 'Zscale_2': -0.22, 'Zscale_3': 0.47},
-		'N': {'Zscale_1': 3.05, 'Zscale_2': 1.62, 'Zscale_3': 1.04},
-		'P': {'Zscale_1': -1.66, 'Zscale_2': 0.27, 'Zscale_3': 1.84},
-		'Q': {'Zscale_1': 1.75, 'Zscale_2': 0.5, 'Zscale_3': -1.44},
-		'R': {'Zscale_1': 3.52, 'Zscale_2': 2.5, 'Zscale_3': -3.5},
-		'S': {'Zscale_1': 2.39, 'Zscale_2': -1.07, 'Zscale_3': 1.15},
-		'T': {'Zscale_1': 0.75, 'Zscale_2': -2.18, 'Zscale_3': -1.12},
-		'V': {'Zscale_1': -2.59, 'Zscale_2': -2.64, 'Zscale_3': -1.54},
-		'W': {'Zscale_1': -4.36, 'Zscale_2': 3.94, 'Zscale_3': 0.59},
-		'Y': {'Zscale_1': -2.54, 'Zscale_2': 2.44, 'Zscale_3': 0.43}
+		'labels':['Lipophilicity','Steric Bulk/Polarizability','Polarity/Charge'],
+		'values':{
+			'A': [0.24, -2.32, 0.6],
+			'C': [0.84, -1.67, 3.71],
+			'D': [3.98, 0.93, 1.93],
+			'E': [3.11, 0.26, -0.11],
+			'F': [-4.22, 1.94, 1.06],
+			'G': [2.05, -4.06, 0.36],
+			'H': [2.47, 1.95, 0.26],
+			'I': [-3.89, -1.73, -1.71],
+			'K': [2.29, 0.89, -2.49],
+			'L': [-4.28, -1.3, -1.49],
+			'M': [-2.85, -0.22, 0.47],
+			'N': [3.05, 1.62, 1.04],
+			'P': [-1.66, 0.27, 1.84],
+			'Q': [1.75, 0.5, -1.44],
+			'R': [3.52, 2.5, -3.5],
+			'S': [2.39, -1.07, 1.15],
+			'T': [0.75, -2.18, -1.12],
+			'V': [-2.59, -2.64, -1.54],
+			'W': [-4.36, 3.94, 0.59],
+			'Y': [-2.54, 2.44, 0.43]
+		}
 	}
 
 	def __init__(self,codon_definition_file:str=None):

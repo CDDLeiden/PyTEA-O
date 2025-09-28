@@ -9,7 +9,7 @@ import collections
 import typing
 
 from src.utils.multiprocess import Pool
-import src.utils.sequence as Sequence
+from src.utils.sequence import SequenceUtilities
 
 class MSA:
 
@@ -67,7 +67,7 @@ class MSA:
 		23:'Z'
 	}
 
-	def __init__(self, msa_file:pathlib.Path, outdir:pathlib.Path,threads:int=1):
+	def __init__(self, msa_file:pathlib.Path,outdir:pathlib.Path,threads:int=1,reference_accession:str|None=None):
 
 		self.msa_file:pathlib.Path = msa_file
 		self.outdir:pathlib.Path = outdir
@@ -78,7 +78,10 @@ class MSA:
 		self.shape = self.msa.shape
 		self.sequence_length,self.num_sequences = self.msa.shape
 		self.accessions = self.msa.columns
+		self.reference_accession = self.__check_reference_accession(reference_accession)
 		
+		self.descriptors_labels = SequenceUtilities.Sandberg_Zscales['labels']
+
 		self.__residue_counts = None
 		self.__distance_matrix = None
 		self.__descriptor_deviation = None
@@ -166,9 +169,9 @@ class MSA:
 
 		def __count_residues(row) -> dict:
 
-			counts = collections.Counter([item for item in row if item in self._INT_TO_CHAR.keys()])
+			counts = collections.Counter([item for item in row if item in self._INT_TO_CHAR])
 
-			return {numeric: counts.get(numeric, 0) for numeric in self._INT_TO_CHAR.keys()}
+			return {numeric: counts.get(numeric, 0) for numeric in self._INT_TO_CHAR}
 		
 		msa:pd.DataFrame = self.msa[accessions]
 
@@ -180,6 +183,25 @@ class MSA:
 		msa_df.columns = [self._INT_TO_CHAR[x] for x in msa_df.columns]
 
 		return msa_df
+	
+	def get_sequence(self,accession:str|None=None) -> str:
+
+		if accession is None:
+			accession = self.reference_accession
+
+		indicies = self.get_reference_indices(accession)
+
+		encoded_sequence = self.msa.loc[indicies][accession]
+
+		return "".join(self.__decode_sequences(encoded_sequence))
+	
+	def get_concensus_sequence(self) -> str:
+
+		return self.residue_counts.idxmax(axis=1)
+	
+	def __decode_sequences(self,encoded_residues:list) -> list:
+
+		return [self._INT_TO_CHAR[x] for x in encoded_residues]
 
 	def __calculate_distances(self,sequence_a_loc:str) -> typing.Tuple[str,dict]:
 
@@ -215,7 +237,9 @@ class MSA:
 	def __apply_sequence_descriptors(self):
 
 		## WxR matrix
-		descriptors:pd.DataFrame = pd.DataFrame.from_dict(Sequence.SequenceUtilities.Sandberg_Zscales)
+		descriptors:pd.DataFrame = pd.DataFrame.from_dict(SequenceUtilities.Sandberg_Zscales['values'])
+
+		descriptors.index = index=SequenceUtilities.Sandberg_Zscales['labels']
 
 		## PxR
 		residue_counts:pd.DataFrame = self.residue_counts[self.residue_counts.columns.intersection(descriptors.columns)]
@@ -236,10 +260,20 @@ class MSA:
 
 		standard_dev = np.sqrt(weighted_variance)
 
-		normalized_dev = pd.DataFrame(standard_dev/np.max(standard_dev),columns=descriptors.columns)
+		max_dev = standard_dev.max().max()
+
+		normalized_dev = pd.DataFrame(standard_dev/max_dev,columns=descriptors.index)
 
 		return normalized_dev
 
+	def __check_reference_accession(self,accession=str|None) -> str:
+		reference_accession:str
+		if accession in self.accessions:
+			reference_accession = accession
+		else:
+			reference_accession = self.accessions[0]
+		return reference_accession
+	
 	@property
 	def distance_matrix(self) -> pd.DataFrame:
 		if self.__distance_matrix is None:
@@ -257,3 +291,5 @@ class MSA:
 		if self.__descriptor_deviation is None:
 			self.__descriptor_deviation = self.__apply_sequence_descriptors()
 		return self.__descriptor_deviation
+
+
