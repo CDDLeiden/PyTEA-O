@@ -1,8 +1,7 @@
 import os
 import pathlib
-import pandas as pd
 import argparse
-import inspect
+
 
 def valid_file(path:str) -> pathlib.Path:
 
@@ -133,42 +132,3 @@ def create_directory(outdir:str) -> None:
 	os.makedirs(outdir,0o750,exist_ok=True)
 
 	return None
-
-def read_subfamilies(subfamilies_file:str) -> dict:
-
-	"""
-	Reads subfamily file created by upgma_subfam_grouping.py
-
-	#### Input
-	*str* Filepath to subfamilies file
-
-
-	#### Returns
-	*dict* A hash of hashes containing all subfamilies for all branchpoints.
-	The first set of keys are the branchpoints and the second is the group numbers for the subfamilies.
-	The stored values are all the accessions for the corresponding group at the corresponding
-	branchpoint.
-	"""
-
-	## Load in subfamily information; headers being keys and values being the subfamily it belongs to
-	subfamilies = pd.read_csv(subfamilies_file,header=0,index_col=None,sep=';')
-
-	families = {}
-
-	## Each line represents a branch point; several sequences can be joined at the same branch point
-	for index,branch in subfamilies.iterrows():
-
-		families[index] = {}
-
-		## Iterate over all sequences IDs, assigning them to their group numbers
-		for key,value in branch.to_dict().items():
-
-			## Initialize subfamliy at the current index
-			if value not in families[index].keys():
-
-				families[index][value] = []
-
-			## Add the sequence ID to the proper subfamily
-			families[index][value].append(key)
-
-	return families
