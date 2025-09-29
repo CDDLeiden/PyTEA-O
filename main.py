@@ -74,7 +74,7 @@ def run(args:argparse.Namespace|None=None) -> None:
 
 	if args.highlight_file:
 
-		figure.hightlight_residues()
+		figure.hightlight_residues(gen_util.get_highlight_residues(args.highlight_file))
 
 	figure.save_fig(file_type="png")
 
