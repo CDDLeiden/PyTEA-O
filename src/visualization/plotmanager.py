@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 import typing
 import pathlib
+import random
 
 from src.analysis.twoentropyanalysis import TwoEntropyAnalysis
 from src.utils.visualization import import_all_subplots,SUBPLOT_REGISTRY
@@ -25,6 +26,8 @@ class PlotManager(SubplotBase):
 
 		import_all_subplots()
 
+		self.tea = tea
+
 		self.subplots = self.__decode_subplots_str(subplots)
 		self.row,self.col = self.__get_gridspec_sizes()
 
@@ -32,37 +35,65 @@ class PlotManager(SubplotBase):
 
 		self.width = self.FONT_SIZE*(1/72)*self.length_of_sequence*1.5
 
-		fig = plt.figure(figsize=(self.width,self.row*2))
+		self.fig = plt.figure(figsize=(self.width,self.row*2))
 
-		gs = GridSpec(self.row,self.col,fig)
+		self.gs = GridSpec(self.row,self.col,self.fig)
 
 		current_row:int = 0
-		axes:list[plt.axes] = []
+		self.axes:list[plt.axes] = []
 		for plot in self.subplots:
 
-			ax = fig.add_subplot(gs[current_row:current_row+plot.ROWSPAN,:])
+			ax = self.fig.add_subplot(self.gs[current_row:current_row+plot.ROWSPAN,:])
 			current_row += plot.ROWSPAN
-			plot(tea).plot(ax)
-			axes.append(ax)
+			plot(self.tea).plot(ax)
+			self.axes.append(ax)
 
-		self.__add_top_labels(axes[0])
-		self.__add_bottom_labels(axes[-1])
-		
+		self.__add_top_labels(self.axes[0])
+		self.__add_bottom_labels(self.axes[-1])
 
-		plt.tight_layout()
-		plt.savefig(f"{outdir}/test.png",dpi=300)
+		self.fig.tight_layout()
 
-	def __hightlight_residues(self):
 
-		...
-		# if highlights is not None:
-		# rand_colors = sample(range(0,len(highlight_colors)-1),len(highlights.keys()))
-		# xmin,ymax,width,height = plots[0].get_position(original=True).bounds
-		# _,ymin,_,_ = plots[-1].get_position(original=True).bounds
-		# step = width/(len(res_nums))
-		# for index,source in enumerate(highlights.keys()):
-		# 	for val_x in highlights[source]:
-		# 		fig.patches.append(plt.Rectangle((xmin+((val_x+0.25)*step),0),step/2,1,facecolor=highlight_colors[rand_colors[index]],edgecolor="None",zorder=0,alpha=0.25,transform=fig.transFigure))
+	def save_fig(self,file_type:str='svg',dpi:int=300):
+
+		self.fig.savefig(self.outdir/f"figure.{file_type.replace(".","")}",dpi=dpi)
+
+	def hightlight_residues(self,highlight_set:dict):
+
+		### Pick random colors from the specified highlight colors
+		rand_colors = random.sample(range(0,len(self.highlight_colors)-1),len(highlight_set.keys()))
+
+		### Find the starting position and the width of the axes in the figure
+		xmin,_,width,_ = self.axes[0].get_position(original=True).bounds
+
+		### Calculate how wide each position in the MSA takes up in the figure
+		step = width/(len(self.residue_numbers))
+
+
+		for index,source in enumerate(highlight_set.keys()):
+
+			for val_x in highlight_set[source]:
+
+				## Skip out-of-bounds positions
+				if val_x < 1 or val_x > self.length_of_sequence:
+					continue
+
+				## Create a residue stripe
+				### Offset by +0.25 to center stripe
+				### Offset by -1.0 to account for 0-indexing, residue 1 -> index 0
+				### Stripe is only half the width of the residue
+				residue_stripe = plt.Rectangle(
+					(xmin+((val_x+0.25-1)*step),0),
+					step/2,1,
+					facecolor=self.highlight_colors[rand_colors[index]],
+					edgecolor="None",
+					zorder=0,
+					alpha=0.25,
+					transform=self.fig.transFigure
+				)
+
+				## Add residue stripe to the figure
+				self.fig.patches.append(residue_stripe)
 
 	def __add_top_labels(self,axes):
 
