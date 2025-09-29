@@ -70,11 +70,7 @@ def run(args:argparse.Namespace|None=None) -> None:
 
 	tea = TEA.TwoEntropyAnalysis(msa,tree,threads=args.threads,outdir=args.outdir/"TEA")
 
-	figure = PlotManager.PlotManager(tea=tea,subplots=args.plot_layout,outdir=args.outdir/"plots")
-
-	if args.highlight_file:
-
-		figure.hightlight_residues(gen_util.get_highlight_residues(args.highlight_file))
+	figure = PlotManager.PlotManager(tea=tea,subplots=args.plot_layout,outdir=args.outdir/"plots",highlight_file=args.highlight_file)
 
 	figure.save_fig(file_type="png")
 

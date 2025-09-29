@@ -89,33 +89,3 @@ def create_directory(outdir:str) -> None:
 	os.makedirs(outdir,0o750,exist_ok=True)
 
 	return None
-
-def get_highlight_residues(file:pathlib.Path) -> dict:
-
-	selection = {}
-
-	source:str
-	with file.open('r') as IN:
-
-		for line in IN:
-			
-			line = line.strip()
-
-			if line == "":
-				continue
-
-			if line[0] == "#":
-				source = line.replace("#","").strip()
-				selection[source] = set()
-				continue
-
-			for value in line.split(","):
-				split = value.split("-")
-				try:
-					split = [int(x) for x in split]
-				except:
-					raise TypeError(f"Specified residues must be specified by an integer, {split} is not valid.")
-				span = list(range(split[0],split[-1]+1))
-				selection[source].update(span)
-
-	return selection

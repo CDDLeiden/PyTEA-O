@@ -20,7 +20,7 @@ class PlotManager(SubplotBase):
 		"DescriptorHeatmap"
 	]
 
-	def __init__(self,tea:TwoEntropyAnalysis,subplots:str='111111',outdir:pathlib.Path|None="./plots"):
+	def __init__(self,tea:TwoEntropyAnalysis,subplots:str='111111',outdir:pathlib.Path|None="./plots",highlight_file:pathlib.Path|None=None):
 
 		super().__init__(tea)
 
@@ -30,6 +30,8 @@ class PlotManager(SubplotBase):
 
 		self.subplots = self.__decode_subplots_str(subplots)
 		self.row,self.col = self.__get_gridspec_sizes()
+
+		self.highlight_file = highlight_file
 
 		self.outdir = valid_directory(outdir)
 
@@ -51,6 +53,9 @@ class PlotManager(SubplotBase):
 		self.__add_top_labels(self.axes[0])
 		self.__add_bottom_labels(self.axes[-1])
 
+		if self.highlight_file is not None:
+			self.__hightlight_residues(self.highlight_file)
+
 		self.fig.tight_layout()
 
 
@@ -58,7 +63,39 @@ class PlotManager(SubplotBase):
 
 		self.fig.savefig(self.outdir/f"figure.{file_type.replace(".","")}",dpi=dpi)
 
-	def hightlight_residues(self,highlight_set:dict):
+	def __get_highlight_residues(self,file:pathlib.Path) -> dict:
+
+		selection = {}
+
+		source:str
+		with file.open('r') as IN:
+
+			for line in IN:
+				
+				line = line.strip()
+
+				if line == "":
+					continue
+
+				if line[0] == "#":
+					source = line.replace("#","").strip()
+					selection[source] = set()
+					continue
+
+				for value in line.split(","):
+					split = value.split("-")
+					try:
+						split = [int(x) for x in split]
+					except:
+						raise TypeError(f"Specified residues must be specified by an integer, {split} is not valid.")
+					span = list(range(split[0],split[-1]+1))
+					selection[source].update(span)
+
+		return selection
+
+	def __hightlight_residues(self,file:pathlib.Path):
+
+		highlight_set = self.__get_highlight_residues(file)
 
 		### Pick random colors from the specified highlight colors
 		rand_colors = random.sample(range(0,len(self.highlight_colors)-1),len(highlight_set.keys()))
