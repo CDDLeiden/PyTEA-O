@@ -78,6 +78,7 @@ class MSA:
 		self.shape = self.msa.shape
 		self.sequence_length,self.num_sequences = self.msa.shape
 		self.accessions = self.msa.columns
+		self.residue_indexes = self.msa.index
 		self.reference_accession = self.__check_reference_accession(reference_accession)
 		
 		self.descriptors_labels = SequenceUtilities.Sandberg_Zscales['labels']

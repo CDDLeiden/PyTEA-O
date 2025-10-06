@@ -8,15 +8,16 @@ import heapq
 import pathlib
 
 from src.utils.msa import MSA
-from src.analysis.phylotree import PhyloTree
+from src.trees.treebase import Tree
 from src.utils.general import valid_directory
 
 class TwoEntropyAnalysis:
 
-	def __init__(self,msa:MSA,tree:PhyloTree,threads:int=1,outdir:str|pathlib.Path=pathlib.Path("./TEA").resolve(strict=False)):
+	def __init__(self,msa:MSA,tree:Tree,threads:int=1,outdir:str|pathlib.Path=pathlib.Path("./TEA").resolve(strict=False)):
 
 		self.msa:MSA = msa
-		self.tree:PhyloTree = tree
+		self.residue_numbers = msa.residue_indexes
+		self.tree:Tree = tree
 		self.threads = threads
 		self.outdir = valid_directory(outdir)
 		self.__average_entropy = None
@@ -37,7 +38,7 @@ class TwoEntropyAnalysis:
 		"""
 
 		## Recover the node using its ID from PhyloTree
-		node:PhyloTree.__Node = self.tree.nodes[node_id]
+		node:Tree.__Node = self.tree.nodes[node_id]
 
 		accessions:list = node.accessions
 
@@ -74,11 +75,11 @@ class TwoEntropyAnalysis:
 		nodal_entropy = self.__calculate_nodal_entropy()
 		nodes_by_distance = self.tree.nodes_by_distance
 
-		average_entropy:np.array = np.zeros(len(self.msa.msa.index))
+		average_entropy:np.array = np.zeros(len(self.residue_numbers))
 
 		for idx,distance in enumerate(sorted(nodes_by_distance.keys())):
 
-			subfamily_entropy:np.array = np.zeros(len(self.msa.msa.index))
+			subfamily_entropy:np.array = np.zeros(len(self.residue_numbers))
 			
 			for node in nodes_by_distance[distance]:
 
@@ -118,7 +119,7 @@ class TwoEntropyAnalysis:
 	@property
 	def global_entropy(self):
 		if self.__global_entropy is None:
-			self.__global_entropy = self.__calculate_shannon_entropy(0,weigh=False)
+			self.__global_entropy = self.__calculate_shannon_entropy(self.tree.root.node_id,weigh=False)
 		return self.__global_entropy
 	
 	@property
