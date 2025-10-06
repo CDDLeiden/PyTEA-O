@@ -148,7 +148,9 @@ class TaxonTree(Tree):
 
 		lineages = self.protein_accessions_to_taxonomic_lineages(accessions)
 
-		active_nodes,accessions_to_nodes_ids = self.bulk_node_creation(accessions)
+		valid_accessions = list(lineages.keys())
+
+		active_nodes,accessions_to_nodes_ids = self.bulk_node_creation(valid_accessions)
 
 		for ridx,rank in enumerate(reversed(self.__RANKS),start=1):
 
@@ -184,4 +186,10 @@ class TaxonTree(Tree):
 				for node in nodes:
 					del(active_nodes[node.node_id])
 
+		if len(active_nodes.keys()) > 1:
+
+			new_node:TaxonTree.Node = self.join_nodes(list(active_nodes.values()),len(self.__RANKS))
+
+			return new_node
+		
 		return next(iter(active_nodes.values()))

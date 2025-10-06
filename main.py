@@ -83,7 +83,7 @@ def run(args:argparse.Namespace|None=None) -> None:
 
 	elif args.tree_type == 'distance_matrix':
 
-		tree = PhyloTree(msa,threads=args.threads)
+		tree = PhyloTree(msa)
 
 	else:
 
