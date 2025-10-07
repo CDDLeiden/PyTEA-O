@@ -1,6 +1,6 @@
 import importlib
 import pkgutil
-import src.visualization.subplots
+import PyTEAO.visualization.subplots
 
 SUBPLOT_REGISTRY = {}
 
@@ -15,6 +15,6 @@ def register(name):
 
 def import_all_subplots():
 	"""Dynamically import all subplot modules to populate the registry."""
-	package = src.visualization.subplots
+	package = PyTEAO.visualization.subplots
 	for _, module_name, _ in pkgutil.iter_modules(package.__path__):
 		importlib.import_module(f"{package.__name__}.{module_name}")

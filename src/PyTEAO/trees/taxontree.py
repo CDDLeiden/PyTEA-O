@@ -4,8 +4,8 @@ from tenacity import retry, wait_fixed, stop_after_attempt
 import time
 import warnings
 
-from src.trees.treebase import Tree
-from src.utils.msa import MSA
+from PyTEAO.trees.treebase import Tree
+from PyTEAO.utils.msa import MSA
 
 class TaxonTree(Tree):
 

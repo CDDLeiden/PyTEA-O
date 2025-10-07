@@ -2,7 +2,7 @@ import os
 import pathlib
 import argparse
 
-from src.utils.visualization import SUBPLOT_REGISTRY,import_all_subplots
+from PyTEAO.utils.visualization import SUBPLOT_REGISTRY,import_all_subplots
 
 
 def valid_file(path:str) -> pathlib.Path:

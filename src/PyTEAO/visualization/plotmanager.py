@@ -4,10 +4,10 @@ import typing
 import pathlib
 import random
 
-from src.analysis.twoentropyanalysis import TwoEntropyAnalysis
-from src.utils.visualization import import_all_subplots,SUBPLOT_REGISTRY
-from src.visualization.subplotbase import SubplotBase
-from src.utils.general import valid_directory
+from PyTEAO.analysis.twoentropyanalysis import TwoEntropyAnalysis
+from PyTEAO.utils.visualization import import_all_subplots,SUBPLOT_REGISTRY
+from PyTEAO.visualization.subplotbase import SubplotBase
+from PyTEAO.utils.general import valid_directory
 
 class PlotManager(SubplotBase):
 

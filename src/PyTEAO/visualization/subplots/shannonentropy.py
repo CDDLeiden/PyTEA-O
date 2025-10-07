@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 from matplotlib.gridspec import GridSpec
 
-from src.analysis.twoentropyanalysis import TwoEntropyAnalysis
-from src.visualization.subplotbase import SubplotBase
-from src.utils.visualization import register
+from PyTEAO.analysis.twoentropyanalysis import TwoEntropyAnalysis
+from PyTEAO.visualization.subplotbase import SubplotBase
+from PyTEAO.utils.visualization import register
 
 @register("ShannonEntropyLine")
 class ShannonEntropyPlot(SubplotBase):

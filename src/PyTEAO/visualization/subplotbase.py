@@ -1,9 +1,9 @@
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 
-from src.utils.msa import MSA
-from src.analysis.twoentropyanalysis import TwoEntropyAnalysis
-from src.utils.sequence import SequenceUtilities
+from PyTEAO.utils.msa import MSA
+from PyTEAO.analysis.twoentropyanalysis import TwoEntropyAnalysis
+from PyTEAO.utils.sequence import SequenceUtilities
 
 
 class SubplotBase:

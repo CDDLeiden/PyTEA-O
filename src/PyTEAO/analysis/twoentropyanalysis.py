@@ -7,9 +7,9 @@ import typing
 import heapq
 import pathlib
 
-from src.utils.msa import MSA
-from src.trees.treebase import Tree
-from src.utils.general import valid_directory
+from PyTEAO.utils.msa import MSA
+from PyTEAO.trees.treebase import Tree
+from PyTEAO.utils.general import valid_directory
 
 class TwoEntropyAnalysis:
 

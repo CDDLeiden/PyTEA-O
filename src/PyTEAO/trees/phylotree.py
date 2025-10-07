@@ -2,8 +2,8 @@ import heapq
 import typing
 import warnings
 
-from src.trees.treebase import Tree
-from src.utils.msa import MSA
+from PyTEAO.trees.treebase import Tree
+from PyTEAO.utils.msa import MSA
 
 class PhyloTree(Tree):
 

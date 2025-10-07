@@ -2,9 +2,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from src.analysis.twoentropyanalysis import TwoEntropyAnalysis
-from src.visualization.subplotbase import SubplotBase
-from src.utils.visualization import register
+from PyTEAO.analysis.twoentropyanalysis import TwoEntropyAnalysis
+from PyTEAO.visualization.subplotbase import SubplotBase
+from PyTEAO.utils.visualization import register
 
 @register("UniqueResidueBar")
 class UniqueResiduesPlot(SubplotBase):

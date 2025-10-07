@@ -1,15 +1,11 @@
-import os
-import time
-import textwrap
-import xarray as xr
 import pandas as pd
 import numpy as np
 import pathlib
 import collections
 import typing
 
-from src.utils.multiprocess import Pool
-from src.utils.sequence import SequenceUtilities
+from PyTEAO.utils.multiprocess import Pool
+from PyTEAO.utils.sequence import SequenceUtilities
 
 class MSA:
 
