@@ -1,0 +1,34 @@
+[project]
+name = "PyTEAO"
+version = "0.1.0"
+description = "Two Entropy Analysis using Phylogenetic/Taxonomic Trees"
+authors = [
+	{ name = "Alexander Thomas Julian", email = "ajulian@hawk.illinoistech.edu" },
+	{ name = "Rosan Kuin", email = "r.c.m.kuin@lacdr.leidenuniv.nl" },
+	{ name = "Sunah Lee", email = "slee249@hawk.iit.edu" }
+]
+readme = "README.md"
+license-files = ["LICENSE"]
+requires-python = ">=3.13"
+dependencies = [
+	"matplotlib",
+	"numpy",
+	"pandas",
+	"pathos",
+	"Requests",
+	"tenacity"
+]
+
+[project.urls]
+Homepage = "https://https://github.com/CDDLeiden/PyTEA-O"
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["PyTEAO"]
+package-dir = { "" = "src" }
+
+[project.scripts]
+PyTEAO = "PyTEAO.main:main"
