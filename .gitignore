@@ -3,9 +3,5 @@ __pycache__/
 *.pyo
 *.pyd
 
-DB_files/names.dmp
-DB_files/nodes.dmp
-DB_files/prot.accession2taxid.FULL.gz
-DB_files/prot.accession2taxid.FULL.gz.md5
-
-example/results
+.venv/
+.vscode/
