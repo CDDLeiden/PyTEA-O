@@ -1,5 +1,0 @@
-hydrophobic A;V;I;L;M;F;Y;W
-uncharged S;T;N;Q
-special C;G;P
-Positive R;H;K
-Negative D;E
