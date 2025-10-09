@@ -15,22 +15,34 @@ class Tree:
 	def __init__(self,msa):
 		
 		self.msa = msa
-		self.nodes:dict = {}
+		self._nodes:dict = {}
 		self.next_node_id:int = 0
-		self.root:Tree.Node = None
+		self._root = None
 		self.__nodes_by_distance = None
+
+	def create_node(self,accessions,node_placement,node_id) -> Node:
+
+		node = self.Node(
+						node_id=node_id,
+						accessions=accessions,
+						node_placement=node_placement
+					)
+
+		return node
 
 	def add_node(self,accessions,node_placement) -> Node:
 
-		node = self.nodes[self.next_node_id] = self.Node(
-											node_id=self.next_node_id,
-											accessions=accessions,
-											node_placement=node_placement
-										)
+		node = self._nodes[self.next_node_id] = self.create_node(accessions,node_placement,self.next_node_id)
 
 		self.next_node_id += 1
 
 		return node
+	
+	def define_node(self,accessions,node_placement,node_id) -> Node:
+
+		self.next_node_id = node_id + 1
+
+		return self.create_node(accessions,node_placement,node_id)
 	
 	def bulk_node_creation(self,accessions) -> dict[str,int]:
 
@@ -82,17 +94,21 @@ class Tree:
 		parent_node_placement:float
 		parent_node_id:int
 
-		while len(active_nodes) < num_of_leafs-1:
+		while len(heap) > 0:
 
 			parent_node_placement,parent_node_id = heapq.heappop(heap)
 
-			parent_node:Tree.Node = self.nodes[parent_node_id]
+			parent_node:Tree.Node = self._nodes[parent_node_id]
 
 			child_node_id:int
 
+			if len(parent_node.children) == 0:
+
+				continue
+
 			for child_node_id in parent_node.children:
 
-				child_node:Tree.Node = self.nodes[child_node_id]
+				child_node:Tree.Node = self._nodes[child_node_id]
 
 				## Traversing tree in reverse, need to invert node_placement by root_placement
 				child_node_placement = root_placement - child_node.node_placement

@@ -38,7 +38,7 @@ class TwoEntropyAnalysis:
 		"""
 
 		## Recover the node using its ID from PhyloTree
-		node:Tree.__Node = self.tree.nodes[node_id]
+		node:Tree.__Node = self.tree._nodes[node_id]
 
 		accessions:list = node.accessions
 
@@ -94,12 +94,12 @@ class TwoEntropyAnalysis:
 	def __calculate_nodal_entropy(self) -> dict:
 
 		nodal_entropy:dict = {}
-		tree_nodes:list = list(self.tree.nodes.keys())
+		tree_nodes:list = list(self.tree._nodes.keys())
 		node_id:int
 
 		for node_id in tree_nodes:
 
-			if len(self.tree.nodes[node_id].accessions) == 1:
+			if len(self.tree._nodes[node_id].accessions) == 1:
 
 				nodal_entropy[node_id] = 0
 				continue

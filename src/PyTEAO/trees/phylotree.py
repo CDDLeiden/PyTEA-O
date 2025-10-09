@@ -1,6 +1,6 @@
 import heapq
 import typing
-import warnings
+import pathlib
 
 from PyTEAO.trees.treebase import Tree
 from PyTEAO.utils.msa import MSA
@@ -12,7 +12,43 @@ class PhyloTree(Tree):
 		super().__init__(msa)
 
 		self.distance_matrix = msa.distance_matrix
-		self.root = self.__upgma()
+
+	def define_tree(self,lineage_file) -> None:
+
+		lineage_file = pathlib.Path(lineage_file)
+
+		self._nodes = {}
+
+		max_placement = 0
+
+		with lineage_file.open('r') as IN:
+
+			line_num = 0
+			
+			for line in IN:
+
+				line_num += 1
+
+				line = line.strip()
+
+				if line[0] == "#":
+					continue
+				
+				node_id,node_placement,accessions = line.split("\t")
+
+				accessions = accessions.split(",")
+				node_id,node_placement = [int(node_id),int(node_placement)]
+
+				node = self.define_node(accessions,node_placement,node_id)
+
+				if self._nodes.get(node_id) is not None:
+					raise ValueError(f"Duplicate node_id [{node_id}] passed on line {line_num}\n\t{line}\nTree building halted to prevent SNAFUs.")
+				
+				self._nodes[node.node_id] = node
+
+				max_placement = max_placement if node_placement < max_placement else node_placement
+
+		self._root = self.join_nodes(list(self._nodes.values()),max_placement+1)
 	
 	def __pair_key(self,node_a_id:int,node_b_id:int) -> frozenset:
 
@@ -95,3 +131,9 @@ class PhyloTree(Tree):
 				heapq.heappush(heap,(new_node_dist,new_node_id,id))
 
 		return next(iter(active_nodes.values()))
+	
+	@property
+	def root(self):
+		if self._root is None:
+			self._root = self.__upgma()
+		return self._root

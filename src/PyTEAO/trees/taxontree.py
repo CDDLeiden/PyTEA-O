@@ -17,8 +17,6 @@ class TaxonTree(Tree):
 
 		super().__init__(msa)
 
-		self.root = self.build_tree()
-
 	@classmethod
 	def protein_accessions_to_taxids(cls,accessions) -> dict:
 
@@ -142,7 +140,7 @@ class TaxonTree(Tree):
 
 		return {x:lineages[links[x]] for x in links.keys()}
 
-	def build_tree(self):
+	def __build_tree(self):
 
 		accessions = self.msa.accessions
 
@@ -193,3 +191,9 @@ class TaxonTree(Tree):
 			return new_node
 		
 		return next(iter(active_nodes.values()))
+	
+	@property
+	def root(self):
+		if self._root is None:
+			self._root = self.__build_tree()
+		return self._root
