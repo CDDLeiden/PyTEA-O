@@ -2,9 +2,7 @@
 
 import argparse
 
-from PyTEAO import PhyloTree, TaxonTree, Tree, PlotManager, MSA
 from PyTEAO import general
-from PyTEAO import TwoEntropyAnalysis as TEA
 
 ARGUEMENTS = {
 	'm':{
@@ -63,8 +61,13 @@ def run(args:argparse.Namespace|None=None) -> None:
 		function_args=ARGUEMENTS,
 	)
 
+	from PyTEAO import MSA
+
 	## Load the MSA
 	msa = MSA(args.msa_file,args.outdir,threads=args.threads)
+
+
+	from PyTEAO import PhyloTree, TaxonTree, Tree
 
 	## Build Tree for Two Entropy Calculations
 	tree:Tree
@@ -82,11 +85,16 @@ def run(args:argparse.Namespace|None=None) -> None:
 		raise ValueError(f"Invalid tree_type {args.tree_type} provided, 'lineage' or 'distance_matrix' supported.")
 
 
+	from PyTEAO import TwoEntropyAnalysis as TEA
+
 	## Perform Two Entropy Analaysis
-	tea = TEA(msa,tree,threads=args.threads,outdir=args.outdir/"TEA")
+	tea = TEA(msa,tree,threads=args.threads,outdir=args.outdir)
+
+
+	from PyTEAO import PlotManager
 
 	## Plot data
-	figure = PlotManager(tea=tea,subplots=args.plot_layout,outdir=args.outdir/"plots",highlight_file=args.highlight_file)
+	figure = PlotManager(tea=tea,subplots=args.plot_layout,outdir=args.outdir,highlight_file=args.highlight_file)
 
 	figure.save_fig(file_type="png")
 

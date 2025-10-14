@@ -2,10 +2,8 @@
 
 import numpy as np
 import pandas as pd
-from time import time
-import typing
-import heapq
 import pathlib
+import pickle
 
 from PyTEAO.utils.msa import MSA
 from PyTEAO.trees.treebase import Tree

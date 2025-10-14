@@ -63,10 +63,15 @@ class MSA:
 		23:'Z'
 	}
 
-	def __init__(self, msa_file:pathlib.Path,outdir:pathlib.Path,threads:int=1,reference_accession:str|None=None):
+	def __init__(self, msa_file:pathlib.Path,outdir:str|pathlib.Path='.TEA',threads:int=1,reference_accession:str|None=None):
+
+		from PyTEAO.utils.general import get_file_name, valid_directory
+
+		self.name:str = get_file_name(msa_file)
+		self.outdir:pathlib.Path = valid_directory(outdir)
+
 
 		self.msa_file:pathlib.Path = msa_file
-		self.outdir:pathlib.Path = outdir
 		self.threads:int = threads
 
 		self.__load_msa(msa_file=self.msa_file)
@@ -131,70 +136,6 @@ class MSA:
 
 		self.msa = pd.DataFrame({x:[self._CHAR_TO_INT[y] for y in msa[x]] for x in msa.keys()})
 
-	def get_reference_indices(self,ref:str) -> np.array:
-
-		"""
-		Returns the indicies of the MSA where the reference has a defined residue
-
-		Parameters:
-		ref (str): Accession number of sequence to be used as reference
-		msa (Pandas.DataFrame): Multiple-Sequence Alignment where each row is the j-th aligned protein sequence and each column is the i-th residue of the alignment.
-
-		Returns:
-		np.array: Indicies where reference has a defined sequence
-		"""
-
-		msa = self.msa
-
-		if ref not in msa.columns:
-			print(f"\n\t[W] Reference {ref} is not found in the provided MSA. Skipping to prevent errors\n\n")
-			return None
-
-		return msa.index[msa[ref]!=0]
-
-	def get_residue_counts(self,accessions:list) -> pd.DataFrame:
-
-		"""
-		Returns the counts of all the different residues present in all sequences at the i-th index, for all index in the MSA.
-		
-		Parameters:
-		msa (pandas.DataFrame): Multiple-Sequence Alignment where each row is the j-th aligned protein sequence and each column is the i-th residue of the alignment.
-
-		Returns:
-		pandas.DataFrame: Sum of residue counts across all sequences for each column (size = AA[24] x MSA_Length)
-		"""
-
-		def __count_residues(row) -> dict:
-
-			counts = collections.Counter([item for item in row if item in self._INT_TO_CHAR])
-
-			return {numeric: counts.get(numeric, 0) for numeric in self._INT_TO_CHAR}
-		
-		msa:pd.DataFrame = self.msa[accessions]
-
-		## Get residue counts 
-		msa_residue_counts = msa.apply(__count_residues,axis=1,result_type='expand')
-
-		msa_df = pd.DataFrame((msa_residue_counts)).fillna(0).astype(int)
-
-		msa_df.columns = [self._INT_TO_CHAR[x] for x in msa_df.columns]
-
-		return msa_df
-	
-	def get_sequence(self,accession:str|None=None) -> str:
-
-		if accession is None:
-			accession = self.reference_accession
-
-		indicies = self.get_reference_indices(accession)
-
-		encoded_sequence = self.msa.loc[indicies][accession]
-
-		return "".join(self.__decode_sequences(encoded_sequence))
-	
-	def get_concensus_sequence(self) -> str:
-
-		return self.residue_counts.idxmax(axis=1)
 	
 	def __decode_sequences(self,encoded_residues:list) -> list:
 
@@ -271,6 +212,71 @@ class MSA:
 			reference_accession = self.accessions[0]
 		return reference_accession
 	
+	def get_reference_indices(self,ref:str) -> np.array:
+
+		"""
+		Returns the indicies of the MSA where the reference has a defined residue
+
+		Parameters:
+		ref (str): Accession number of sequence to be used as reference
+		msa (Pandas.DataFrame): Multiple-Sequence Alignment where each row is the j-th aligned protein sequence and each column is the i-th residue of the alignment.
+
+		Returns:
+		np.array: Indicies where reference has a defined sequence
+		"""
+
+		msa = self.msa
+
+		if ref not in msa.columns:
+			print(f"\n\t[W] Reference {ref} is not found in the provided MSA. Skipping to prevent errors\n\n")
+			return None
+
+		return msa.index[msa[ref]!=0]
+
+	def get_residue_counts(self,accessions:list) -> pd.DataFrame:
+
+		"""
+		Returns the counts of all the different residues present in all sequences at the i-th index, for all index in the MSA.
+		
+		Parameters:
+		msa (pandas.DataFrame): Multiple-Sequence Alignment where each row is the j-th aligned protein sequence and each column is the i-th residue of the alignment.
+
+		Returns:
+		pandas.DataFrame: Sum of residue counts across all sequences for each column (size = AA[24] x MSA_Length)
+		"""
+
+		def __count_residues(row) -> dict:
+
+			counts = collections.Counter([item for item in row if item in self._INT_TO_CHAR])
+
+			return {numeric: counts.get(numeric, 0) for numeric in self._INT_TO_CHAR}
+		
+		msa:pd.DataFrame = self.msa[accessions]
+
+		## Get residue counts 
+		msa_residue_counts = msa.apply(__count_residues,axis=1,result_type='expand')
+
+		msa_df = pd.DataFrame((msa_residue_counts)).fillna(0).astype(int)
+
+		msa_df.columns = [self._INT_TO_CHAR[x] for x in msa_df.columns]
+
+		return msa_df
+	
+	def get_sequence(self,accession:str|None=None) -> str:
+
+		if accession is None:
+			accession = self.reference_accession
+
+		indicies = self.get_reference_indices(accession)
+
+		encoded_sequence = self.msa.loc[indicies][accession]
+
+		return "".join(self.__decode_sequences(encoded_sequence))
+	
+	def get_concensus_sequence(self) -> str:
+
+		return self.residue_counts.idxmax(axis=1)
+
 	@property
 	def distance_matrix(self) -> pd.DataFrame:
 		if self.__distance_matrix is None:
