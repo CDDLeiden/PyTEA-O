@@ -83,8 +83,6 @@ The original source code is no longer available, so we re-implemented the method
 This ensures the approach remains accessible, reproducible, and easy to integrate into modern bioinformatics pipelines
 
 
-## Setup <a name="setup"></a>
->>>>>>> 67c4883 (update README and add ubiquitin example)
 
 ### Prerequisites
 - [Anaconda](https://www.anaconda.com/products/distribution) or [Miniconda](https://docs.conda.io/en/latest/miniconda.html) installed on your system.
@@ -99,21 +97,13 @@ This ensures the approach remains accessible, reproducible, and easy to integrat
 
 2. **Create a new Conda environment**
     ```sh
-<<<<<<< HEAD
     conda create -n pyteao python=3.13
-=======
-    conda env create --file environment.yaml -n TEAO
->>>>>>> 67c4883 (update README and add ubiquitin example)
     ```
 
 3. **Activate the Conda environment and install requirements**
     ```sh
-<<<<<<< HEAD
     conda activate pyteao
     pip install -e .
-=======
-    conda activate TEAO
->>>>>>> 67c4883 (update README and add ubiquitin example)
     ```
 
 4. **(Optional) Deactivate the Conda environment:**
@@ -123,7 +113,6 @@ This ensures the approach remains accessible, reproducible, and easy to integrat
 
 ## Usage <a name="usage"></a>
 
-<<<<<<< HEAD
 For performing a two-entropies analysis, the only input needed is a MSA in FASTA or CLUSTAL format. To quickly get started, we provided an example MSA in the /example directory. The MSA consists of homologous ubiquitin sequences. Running the TEA calculations using the provided MSA allows you to verify that everything is working as expected.
 
 ### Running the TEA(O) calculations
@@ -169,38 +158,6 @@ Where ```-m``` is the location of the MSA, ```-r``` is the ID of the reference s
 ### Interpreting the results
 
 When the code is executed, several output files are generated. The main visualization can be found in **`figure.png`**, which contains a multi-panel figure summarizing entropy calculations and related characteristics for each alignment position. The example figure below shows the output for our sample MSA.
-=======
-For performing a TEA, the only input needed is a MSA in FASTA or CLUSTAL format. To quickly get started, we provided an example MSA in the /example directory. The MSA consists of homologous ubiquitin sequences. Running the TEA calculations using the provided MSA allows you to verify that everything is working as expected.
-
-### Running the TEA(O) calculations
-
-First, you can create subgroups using the UPGMA algorithm
-
-```bash
-python src/upgma_subfam_grouping.py \
-    -m example/ubiquitin.fasta.aligned \
-    -o example/results/subfamilies
-```
-
-Next, the entropy calculations can be started using
-
-```bash
-python src/run_TEA.py \
-    -m example/ubiquitin.fasta.aligned \
-    -o example/results/SE \
-    -r  "KAF8060592" \
-    -t 12 \
-    -e "TEAO"
-    -f example/results/subfamilies/upgma.subfamilies \
-    -c config/graph_results.cfg
-```
-
-Where ```-r``` is the ID of the reference sequence, ```-t``` is the number of threads to use and ```-f``` is the subfamily file that is created within the ```upgma_subfam_grouping.py```
-
-### Interpreting the results
-
-When the code is executed, several output files are generated. The main visualization can be found in **`shannon_entropy.png`**, which contains a multi-panel figure summarizing entropy calculations and related characteristics for each alignment position. The example figure below shows the output for our sample MSA.
->>>>>>> 67c4883 (update README and add ubiquitin example)
 
 ![TEA_ubiquitin](docs/ubiquitin_shannon_entropy.png)
 
@@ -229,10 +186,6 @@ __panel 3: Residue presence matrix__
 
 Each amino acid is represented by a distinct color, while white indicates absence at a given position.  
 This panel makes it easy to spot which residues are present at each alignment position.
-<<<<<<< HEAD
-=======
-The data for this plot is stored in `consensus.logo`.
->>>>>>> 67c4883 (update README and add ubiquitin example)
 
 __panel 4: Residue variants__
 
@@ -252,7 +205,6 @@ This panel visualizes the standard deviations for Z-scale 1–3, which correspon
 3. Polarity/charge  
 
 Darker colors indicate greater variability in these properties at a given position.  
-<<<<<<< HEAD
 More information about Z-scales can be found in [*Sandberg et al., 1998*](https://pubs.acs.org/doi/10.1021/jm9700575).
 
 __changing figure layout__
@@ -261,12 +213,6 @@ To modify the figure layout, use the `-l` argument.
 Each digit in the layout string represents whether a subplot is shown (`1`) or hidden (`0`).
 
 For example, to remove the 6th panel, use: `-l 111110`
-=======
-More information about Z-scales can be found in [*Sandberg et al., 1998*](https://pubs.acs.org/doi/10.1021/jm9700575).  
-
-The individual Z-scores are available in `prot_descriptors_ZscaleSandberg.tsv`.
-
->>>>>>> 67c4883 (update README and add ubiquitin example)
 
 ## License <a name="license"></a>
 
