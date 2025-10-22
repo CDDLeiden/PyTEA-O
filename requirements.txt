@@ -1,0 +1,6 @@
+matplotlib==3.10.6
+numpy==2.3.3
+pandas==2.3.3
+pathos==0.3.4
+Requests==2.32.5
+tenacity==9.1.2
