@@ -52,6 +52,60 @@ class SequenceUtilities:
 		'TAA': '*', 'TAG': '*', 'TGA': '*',
 	}
 
+	AA_TO_INT = {
+		'-':0,
+		'A':1,
+		'B':2,
+		'C':3,
+		'D':4,
+		'E':5,
+		'F':6,
+		'G':7,
+		'H':8,
+		'I':9,
+		'K':10,
+		'L':11,
+		'M':12,
+		'N':13,
+		'P':14,
+		'Q':15,
+		'R':16,
+		'S':17,
+		'T':18,
+		'V':19,
+		'W':20,
+		'Y':21,
+		'X':22,
+		'Z':23
+	}
+
+	INT_TO_AA = {
+		0:'-',
+		1:'A',
+		2:'B',
+		3:'C',
+		4:'D',
+		5:'E',
+		6:'F',
+		7:'G',
+		8:'H',
+		9:'I',
+		10:'K',
+		11:'L',
+		12:'M',
+		13:'N',
+		14:'P',
+		15:'Q',
+		16:'R',
+		17:'S',
+		18:'T',
+		19:'V',
+		20:'W',
+		21:'Y',
+		22:'X',
+		23:'Z'
+	}
+
 	Sandberg_Zscales = {
 		'labels':['Lipophilicity','Steric Bulk/Polarizability','Polarity/Charge'],
 		'values':{

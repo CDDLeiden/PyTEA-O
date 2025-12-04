@@ -9,60 +9,6 @@ from PyTEAO.utils.sequence import SequenceUtilities
 
 class MSA:
 
-	_CHAR_TO_INT = {
-		'-':0,
-		'A':1,
-		'B':2,
-		'C':3,
-		'D':4,
-		'E':5,
-		'F':6,
-		'G':7,
-		'H':8,
-		'I':9,
-		'K':10,
-		'L':11,
-		'M':12,
-		'N':13,
-		'P':14,
-		'Q':15,
-		'R':16,
-		'S':17,
-		'T':18,
-		'V':19,
-		'W':20,
-		'Y':21,
-		'X':22,
-		'Z':23
-	}
-
-	_INT_TO_CHAR = {
-		0:'-',
-		1:'A',
-		2:'B',
-		3:'C',
-		4:'D',
-		5:'E',
-		6:'F',
-		7:'G',
-		8:'H',
-		9:'I',
-		10:'K',
-		11:'L',
-		12:'M',
-		13:'N',
-		14:'P',
-		15:'Q',
-		16:'R',
-		17:'S',
-		18:'T',
-		19:'V',
-		20:'W',
-		21:'Y',
-		22:'X',
-		23:'Z'
-	}
-
 	def __init__(self, msa_file:pathlib.Path,outdir:str|pathlib.Path='.TEA',threads:int=1,reference_accession:str|None=None):
 
 		from PyTEAO.utils.general import get_file_name, valid_directory
@@ -134,12 +80,12 @@ class MSA:
 			print(f"\n\t[N]  Terminating Two-Entropy calculations.")
 			exit()
 
-		self.msa = pd.DataFrame({x:[self._CHAR_TO_INT[y] for y in msa[x]] for x in msa.keys()})
+		self.msa = pd.DataFrame({x:[SequenceUtilities.AA_TO_INT[y] for y in msa[x]] for x in msa.keys()})
 
 	
 	def __decode_sequences(self,encoded_residues:list) -> list:
 
-		return [self._INT_TO_CHAR[x] for x in encoded_residues]
+		return [SequenceUtilities.INT_TO_AA[x] for x in encoded_residues]
 
 	def __calculate_distances(self,sequence_a_loc:str) -> typing.Tuple[str,dict]:
 
@@ -249,9 +195,9 @@ class MSA:
 
 		def __count_residues(row) -> dict:
 
-			counts = collections.Counter([item for item in row if item in self._INT_TO_CHAR])
+			counts = collections.Counter([item for item in row if item in SequenceUtilities.INT_TO_AA])
 
-			return {numeric: counts.get(numeric, 0) for numeric in self._INT_TO_CHAR}
+			return {numeric: counts.get(numeric, 0) for numeric in SequenceUtilities.INT_TO_AA}
 		
 		msa:pd.DataFrame = self.msa[accessions]
 
@@ -260,7 +206,7 @@ class MSA:
 
 		msa_df = pd.DataFrame((msa_residue_counts)).fillna(0).astype(int)
 
-		msa_df.columns = [self._INT_TO_CHAR[x] for x in msa_df.columns]
+		msa_df.columns = [SequenceUtilities.INT_TO_AA[x] for x in msa_df.columns]
 
 		return msa_df
 	
