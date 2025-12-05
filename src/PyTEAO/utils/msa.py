@@ -3,19 +3,33 @@ import numpy as np
 import pathlib
 import collections
 import typing
+import logging
 
 from PyTEAO.utils.multiprocess import Pool
 from PyTEAO.utils.sequence import SequenceUtilities
+from PyTEAO.utils.general import valid_directory, get_file_hash, pickle_load, pickle_dump
+
+logger = logging.getLogger(__name__)
 
 class MSA:
 
 	def __init__(self, msa_file:pathlib.Path,outdir:str|pathlib.Path='.TEA',threads:int=1,reference_accession:str|None=None):
 
-		from PyTEAO.utils.general import get_file_name, valid_directory
 
-		self.name:str = get_file_name(msa_file)
+		logging.info("Initializing MSA object.")
+
 		self.outdir:pathlib.Path = valid_directory(outdir)
+		
+		self.__cache_file:pathlib.Path = self.outdir/".cache"/f".{get_file_hash(msa_file)}"/"msa.pkl"
 
+		existing_MSA = pickle_load(self.__cache_file)
+
+		if existing_MSA:
+
+			logging.info("Pickled MSA object found for the provided input.")
+			logging.info("Loading Pickled MSA object")
+
+			return existing_MSA
 
 		self.msa_file:pathlib.Path = msa_file
 		self.threads:int = threads
@@ -229,18 +243,21 @@ class MSA:
 	def distance_matrix(self) -> pd.DataFrame:
 		if self.__distance_matrix is None:
 			self.__distance_matrix = self.__calculate_sequence_difference()
+		pickle_dump(self,self.__cache_file)
 		return self.__distance_matrix
 	
 	@property
 	def residue_counts(self) -> pd.DataFrame:
 		if self.__residue_counts is None:
 			self.__residue_counts = self.get_residue_counts(accessions=self.msa.columns)
+		pickle_dump(self,self.__cache_file)
 		return self.__residue_counts
 
 	@property
 	def descriptor_deviation(self) -> pd.DataFrame:
 		if self.__descriptor_deviation is None:
 			self.__descriptor_deviation = self.__apply_sequence_descriptors()
+		pickle_dump(self,self.__cache_file)
 		return self.__descriptor_deviation
 
 

@@ -1,15 +1,56 @@
 import os
 import pathlib
 import argparse
+import hashlib
+import tempfile
+import pickle
+import logging
 
-from PyTEAO.utils.visualization import SUBPLOT_REGISTRY,import_all_subplots
+logging = logging.getLogger(__name__)
+
+def pickle_dump(obj:object,pickle_file:pathlib.Path):
+
+	logging.info(f"Pickling {obj.__class__} object")
+
+	pickle_file = pathlib.Path(pickle_file).resolve(strict=False)
+
+	with tempfile.NamedTemporaryFile(dir=pickle_file.parent,delete=False) as tmp:
+		pickle.dump(obj,tmp,protocol=pickle.HIGHEST_PROTOCOL)
+		tmp_file = pathlib.Path(tmp.name)
+	
+	os.replace(tmp_file,pickle_file)
+
+	logging.info(f"{obj.__class__} pickled succesfully.")
 
 
-def valid_file(path:str) -> pathlib.Path:
+def pickle_load(pickle_file:pathlib.Path) -> object|None:
+
+	pickle_file = valid_file(pickle_file,warn=False)
+
+	if not pickle_file:
+		return None
+
+	with pickle_file.open("rb") as f:
+		return pickle.load(f)
+	
+
+def get_file_hash(filepath:pathlib.Path):
+
+	filepath = pathlib.Path(filepath).resolve(strict=False)
+
+	with filepath.open("rb") as f:
+		return hashlib.file_digest(f,"md5")
+
+
+def valid_file(path:str,warn:bool=True) -> pathlib.Path|None:
 
 	p = pathlib.Path(path).resolve(strict=False)
 	
 	if not p.is_file():
+		
+		if not warn:
+			return None
+		
 		raise argparse.ArgumentTypeError(f"File not found: {path}")
 	
 	return p
@@ -38,6 +79,8 @@ def valid_directory(path:str) -> pathlib.Path:
 	return p
 
 def binary(layout:str) -> str:
+
+	from PyTEAO.utils.visualization import SUBPLOT_REGISTRY,import_all_subplots
 
 	import_all_subplots()
 
