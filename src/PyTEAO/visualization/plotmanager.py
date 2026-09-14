@@ -23,7 +23,12 @@ class PlotManager(SubplotBase):
 		"DescriptorHeatmap"
 	]
 
-	def __init__(self,tea:TwoEntropyAnalysis,subplots:str='111111',outdir:pathlib.Path|None="./plots",highlight_file:pathlib.Path|None=None):
+	def __init__(self,
+			tea:TwoEntropyAnalysis,
+			subplots:str='111111',
+			outdir:pathlib.Path|None="./plots",
+			highlight_file:pathlib.Path|None=None
+		):
 
 		super().__init__(tea)
 
@@ -56,11 +61,10 @@ class PlotManager(SubplotBase):
 		self.__add_top_labels(self.axes[0])
 		self.__add_bottom_labels(self.axes[-1])
 
-		if self.highlight_file is not None:
-			self.__hightlight_residues(self.highlight_file)
-
 		self.fig.tight_layout()
 
+		if self.highlight_file is not None:
+			self.__hightlight_residues(self.highlight_file)
 
 	def save_fig(self,file_type:str='svg',dpi:int=300):
 
@@ -108,7 +112,6 @@ class PlotManager(SubplotBase):
 
 		### Calculate how wide each position in the MSA takes up in the figure
 		step = width/(len(self.residue_numbers))
-
 
 		for index,source in enumerate(highlight_set.keys()):
 
