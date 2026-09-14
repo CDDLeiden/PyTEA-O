@@ -56,9 +56,11 @@ def plot_validation_figure(tea:TEA, outdir:pathlib.Path, plot_title:str, plot_na
 	plt.savefig(outdir/plot_name,dpi=300,bbox_inches='tight',pad_inches=0.05)
 
 
-def validate(args:argparse.Namespace) -> None:
+def validate(
+		outdir
+	) -> None:
 
-	outdir = pathlib.Path("./ValidationResults")
+	outdir = outdir/"ValidationResults"
 
 	validation_msa = importlib.resources.files("PyTEAO.package_data.validation_data")/"Ye-et-al_2008_alignment.fasta"
 
