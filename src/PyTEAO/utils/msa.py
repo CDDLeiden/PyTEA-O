@@ -63,7 +63,12 @@ class MSA:
 		23:'Z'
 	}
 
-	def __init__(self, msa_file:pathlib.Path,outdir:str|pathlib.Path='.TEA',threads:int=1,reference_accession:str|None=None):
+	def __init__(self,
+			msa_file:pathlib.Path,
+			outdir:str|pathlib.Path='.TEA',
+			threads:int=1,
+			reference_accession:str|None=None
+		):
 
 		from PyTEAO.utils.general import get_file_name, valid_directory
 
@@ -177,34 +182,54 @@ class MSA:
 	def __apply_sequence_descriptors(self):
 
 		## WxR matrix
-		descriptors:pd.DataFrame = pd.DataFrame.from_dict(SequenceUtilities.Sandberg_Zscales['values'])
+		descriptors:pd.DataFrame = pd.DataFrame(
+										SequenceUtilities.Sandberg_Zscales['values'],
+										index = SequenceUtilities.Sandberg_Zscales['labels']
+									)
 
-		descriptors.index = index=SequenceUtilities.Sandberg_Zscales['labels']
+		residues = self.residue_counts.columns.intersection(descriptors.columns)
 
-		## PxR
-		residue_counts:pd.DataFrame = self.residue_counts[self.residue_counts.columns.intersection(descriptors.columns)]
+		counts = self.residue_counts[residues]
 
-		## 1xRxW
-		weights = descriptors.values.T[np.newaxis:,:]
-		## PxRx1
-		counts = residue_counts.values[:,:,np.newaxis]
+		pos_cov = counts.sum(axis=1)
+		low_cov = pos_cov <= 0.25*self.residue_counts.sum(axis=1)
 
-		## Px1
-		total_res = residue_counts.sum(axis=1).values[:,np.newaxis]
+		## Variance of a distribution is defined as
+		## Var(X) = E[(X-u)**2]
+		##
+		## Which expands to
+		## Var(X) = E[X**2 - 2Xu + u**2]
+		## Var(x) = E[X**2] - E[2Xu] + E[u**2]
+		##
+		## Because u is a constant
+		## Var(X) = E[X**2] - 2uE[X] + u**2
+		##
+		## Because E[X] == u
+		## Var(X) = E[X**2] - 2u**2 + u**2
+		## Var(X) = E[X**2] - u**2
 
-		## Px3
-		weighted_mean = np.sum(counts*weights,axis=1)/total_res
+		## mean
+		m = counts.dot(descriptors.T).div(pos_cov,axis=0)
 
-		diff_squared = (weights[np.newaxis,:,:]-weighted_mean[:,np.newaxis,:])**2
-		weighted_variance = np.sum(counts*diff_squared,axis=1)/total_res
+		## Weighted mean of squares
+		ms = counts.dot((descriptors**2).T).div(pos_cov,axis=0)
 
-		standard_dev = np.sqrt(weighted_variance)
+		## Variance
+		v = np.maximum(ms-(m**2),0)
 
-		max_dev = standard_dev.max().max()
+		## Standard Deviation
+		std = np.sqrt(v)
 
-		normalized_dev = pd.DataFrame(standard_dev/max_dev,columns=descriptors.index)
+		std[low_cov] = np.nan
 
-		return normalized_dev
+		## Popoviciu's inqequality of varainces says that maximum variance
+		## for a bounded property occurs when the dataset is split equally
+		## between the two extrema of the property
+		theor_max_std = (descriptors.max(axis=1) - descriptors.min(axis=1))/2
+
+		norm_std = std.div(theor_max_std,axis=1)
+
+		return norm_std
 
 	def __check_reference_accession(self,accession=str|None) -> str:
 		reference_accession:str
